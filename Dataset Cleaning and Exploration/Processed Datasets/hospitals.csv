@@ -1,4 +1,4 @@
-name_orig,Hospital,latitude,longitude,postal_code,type_road,road,number,km0_x,km0_y
+name_orig,Hospital,latitude,longitude,postal_code,type_road,road,number,latitude_km0,longitude_km0
 Concepción (Fund. J. Díaz),Concepción (Fund. J. Díaz),40.439093,-3.7192510000000003,28040.0,Avda.,Reyes Católicos,2,0.024443,-0.018851
 Doce de Octubre,Doce de Octubre,40.376242,-3.698663,28041.0,Avda.,Córdoba,s/n,-0.038408,0.001737
 Clínico San Carlos,Clínico San Carlos,40.44106,-3.7192230000000004,28040.0,Calle,Profesor Martín Lagos,s/n,0.02641,-0.018823
