@@ -16,6 +16,6 @@ Reinforced learning based logistic system for SAMUR emergency vehicles deploymen
 # External links
 - Article in Medium (TBD)
 
-# Aknowledgments
+# Acknowledgments
 - [Saturdays AI](https://www.saturdays.ai/) Madrid, for bringing us together. 
 - [Ayuntamiento de Madrid](https://www.madrid.es/portal/site/munimadrid), for their [Open Data portal](https://datos.madrid.es/portal/site/egob/), that made this project feasible.
