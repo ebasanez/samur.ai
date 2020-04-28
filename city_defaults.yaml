@@ -158,3 +158,4 @@ hospitals:
     x: 6.956
     y: -3.685
 shown_emergencies_per_gravity: 20
+update_period: 900

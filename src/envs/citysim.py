@@ -28,6 +28,9 @@ from gym import spaces
 from gym.utils import seeding
 from recordclass import recordclass
 
+from districts_manager import DistrictsManager
+from traffic_manager import TrafficManager
+
 
 class CitySim(gym.Env):
     """Gym environment for simulating ambulance emergencies in a city.
@@ -91,6 +94,7 @@ class CitySim(gym.Env):
         },
         "emergency_levels": 5,
         "shown_emergencies_per_gravity": 20,
+        "update_period": 900,
     }
 
     def __init__(
@@ -98,6 +102,7 @@ class CitySim(gym.Env):
         city_config=None,  # YAML file w/ city and generator data
         time_step: timedelta = timedelta(seconds=60),
         stress: float = 1.0,
+        districts_geom_folder = '../data/districts',
     ):
         """Initialize the CitySim environment."""
 
@@ -120,6 +125,10 @@ class CitySim(gym.Env):
             with open(city_config) as config_file:
                 config = yaml.safe_load(config_file)
                 self._configure(config)
+
+        # Read info about districts shapes and centroids
+        self.district_manager = DistrictsManager(districts_geom_folder)
+        self.traffic_manager = TrafficManager(self.update_period, self.districts)
 
     def seed(self):
         pass
@@ -224,6 +233,7 @@ class CitySim(gym.Env):
         self.districts = config["districts"]
         self.emergency_levels = config["emergency_levels"]
         self.shown_emergencies_per_gravity = config["shown_emergencies_per_gravity"]
+        self.update_period = config["update_period"]
 
     def _get_obs(self):
         """Build the part of the state that the agent can know about.
@@ -302,10 +312,10 @@ class CitySim(gym.Env):
         """
 
         # DUMMY GENERATOR; TO BE COMPLETED
-        carthesian_distance = abs(start[0] - end[0]) + abs(start[1] - end[1])
-        speed = np.random.normal(1, 0.3)
+        distance_per_district = self.district_manager.get_segments_per_district(district_start, start, district_end, end)
+        total_time = self.traffic_manager.get_displacement_time(distance_per_district)
 
-        return carthesian_distance / speed  # Tiempo de desplazamiento [sec]
+        return total_time  # Tiempo de desplazamiento [sec]
 
     def _reward_f(self, time_diff):
         """Possible non-linear fuction to apply to the time difference between an ambulance arrival
