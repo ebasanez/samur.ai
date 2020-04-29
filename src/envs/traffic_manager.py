@@ -23,6 +23,9 @@ class TrafficManager():
         if time.time() - self.last_update > self.update_period:
             self._update_traffic()
 
+        other_districts_traffic = [self.traffic[district] for district in distance_per_district.keys() if district != 'Missing']
+        self.traffic['Missing'] = sum(other_districts_traffic) / len(other_districts_traffic)
+
         total_time = sum([distance / utils.get_speed(self.traffic[district]) for district, distance in distance_per_district.items()])
 
         return total_time
