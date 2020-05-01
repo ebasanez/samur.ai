@@ -1,0 +1,20 @@
+emergency_levels: 5
+hospitals:
+  0:
+    available_amb: 0
+    loc: !!python/tuple
+    - 0
+    - 0
+    'null': Gregorio Marañón
+  1:
+    available_amb: 10
+    loc: !!python/tuple
+    - 34
+    - 53
+    name: Gregorio Marañón
+  2:
+    available_amb: 14
+    loc: !!python/tuple
+    - -2
+    - -12
+    name: 12 de Octubre

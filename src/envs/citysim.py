@@ -4,12 +4,12 @@
 Gym environment for simulating the development of emergencies requiring ambulance in a city.
 
 This environment will be used in order to train a resurce allocation agent. The agent receives
-information about emergencies and their gravity. The agent can send an ambulance to attend the
+information about emergencies and their severity. The agent can send an ambulance to attend the
 emergency from one of the different hospitals in the city, and make the ambulance go back to the
 original hospital or to one of the other hospitals in the city.
 
 If not responded to in time, the emergencies can result in failure situations, sampled from a
-probability distribution according to their gravity.
+probability distribution according to their severity.
 
 Emergencies are gerated from representative probability distributions.
 
@@ -48,23 +48,21 @@ class CitySim(gym.Env):
     defaults = {
         "hospitals": {
             0: {"name": "AAA", "x": 0.0, "y": 0.0},
-            1: {"name": "Alcalá de Henares (Ppe. de Asturias)", "x": 29.814, "y": 10.59},
-            2: {"name": "Central de la Defensa", "x": -3.849, "y": -2.765},
-            3: {"name": "Clínico San Carlos", "x": -1.593, "y": 2.937},
-            4: {"name": "Concepción (Fund. J. Díaz)", "x": -1.596, "y": 2.718},
-            5: {"name": "Doce de Octubre", "x": 0.147, "y": -4.271},
-            6: {"name": "Doctor Rodriguez Lafora", "x": 0.786, "y": 13.054},
-            7: {"name": "Getafe", "x": -3.506, "y": -11.325},
-            8: {"name": "Gregorio Marañón", "x": 2.59, "y": 0.523},
-            9: {"name": "Infanta Leonor", "x": 7.038, "y": -3.105},
-            10: {"name": "La Paz", "x": 1.13, "y": 7.416},
-            11: {"name": "La Princesa", "x": 2.181, "y": 2.189},
-            12: {"name": "Moncloa (ASISA)", "x": -2.914, "y": 2.06},
-            13: {"name": "Niño Jesús (Infantil)", "x": 2.123, "y": 0.007},
-            14: {"name": "Puerta de Hierro", "x": -14.652, "y": 3.992},
-            15: {"name": "Ramón y Cajal", "x": 0.5, "y": 8.142},
-            16: {"name": "Santa Cristina", "x": 2.553, "y": 0.821},
-            17: {"name": "Virgen de la torre", "x": 6.956, "y": -3.685},
+            1: {"name": "Central de la Defensa", "x": -3.849, "y": -2.765},
+            2: {"name": "Clínico San Carlos", "x": -1.593, "y": 2.937},
+            3: {"name": "Concepción (Fund. J. Díaz)", "x": -1.596, "y": 2.718},
+            4: {"name": "Doce de Octubre", "x": 0.147, "y": -4.271},
+            5: {"name": "Doctor Rodriguez Lafora", "x": 0.786, "y": 13.054},
+            6: {"name": "Gregorio Marañón", "x": 2.59, "y": 0.523},
+            7: {"name": "Infanta Leonor", "x": 7.038, "y": -3.105},
+            8: {"name": "La Paz", "x": 1.13, "y": 7.416},
+            9: {"name": "La Princesa", "x": 2.181, "y": 2.189},
+            10: {"name": "Moncloa (ASISA)", "x": -2.914, "y": 2.06},
+            11: {"name": "Niño Jesús (Infantil)", "x": 2.123, "y": 0.007},
+            12: {"name": "Puerta de Hierro", "x": -14.652, "y": 3.992},
+            13: {"name": "Ramón y Cajal", "x": 0.5, "y": 8.142},
+            14: {"name": "Santa Cristina", "x": 2.553, "y": 0.821},
+            15: {"name": "Virgen de la torre", "x": 6.956, "y": -3.685},
         },
         "districts": {
             1: {"name": "CENTRO", "surface": 5.21, "density": 25340.69},
@@ -89,40 +87,39 @@ class CitySim(gym.Env):
             20: {"name": "SAN BLAS", "surface": 22.26, "density": 6934.37},
             21: {"name": "BARAJAS", "surface": 43.56, "density": 1076.06},
         },
-        "emergency_levels": 5,
-        "shown_emergencies_per_gravity": 20,
+        "severity_levels": 5,
+        "shown_emergencies_per_severity": 20,
     }
 
     def __init__(
         self,
-        city_config=None,  # YAML file w/ city and generator data
-        time_step: timedelta = timedelta(seconds=60),
+        city_config="city_defaults.yaml",  # YAML file w/ city and generator data
+        time_step: int = 60,
         stress: float = 1.0,
     ):
         """Initialize the CitySim environment."""
 
-        self.time_step = time_step
+        self.time_step_seconds = time_step
+        self.time_step = timedelta(seconds=self.time_step_seconds)
         self.stress = stress
 
         # Named lists for status keeping
         self.hospital = recordclass("Hospital", ["name", "loc", "avail_amb"])
-        self.emergency = recordclass("Emergency", ["loc", "gravity", "tappearance", "tfailure"])
+        self.emergency = recordclass("Emergency", ["loc", "severity", "tappearance"])
         self.moving_amb = recordclass(
             "MovingAmbulance", ["tobjective", "thospital", "destination", "reward"]
         )
 
         # Read configuration file for setting up the city
-        if city_config is None:
-            self._configure(self.defaults)
-        elif type(city_config) is dict:
+        if type(city_config) is dict:
             self._configure(city_config)
         else:
             with open(city_config) as config_file:
                 config = yaml.safe_load(config_file)
                 self._configure(config)
 
-    def seed(self):
-        pass
+    def seed(self, seed):
+        np.random.seed(seed)
 
     def reset(
         self,
@@ -137,7 +134,7 @@ class CitySim(gym.Env):
         self.time_end = time_end
 
         self.time = self.time_start
-        self.active_emergencies = ["dummy"] + [deque() for i in range(self.emergency_levels)]
+        self.active_emergencies = ["dummy"] + [deque() for i in range(self.severity_levels)]
         self.outgoing_ambulances = []
         self.incoming_ambulances = []
 
@@ -148,7 +145,7 @@ class CitySim(gym.Env):
         # Advance time
         self.time += self.time_step
 
-        # Generate new emergencies. Emergencies are a series of FIFO lists, one per gravity
+        # Generate new emergencies. Emergencies are a series of FIFO lists, one per severity
         self._generate_emergencies()
 
         # Check for objectives in outgoing ambulances and apply failures to reward
@@ -171,18 +168,18 @@ class CitySim(gym.Env):
                 new_outgoing.append(ambulance)
         self.incoming_ambulances = new_incoming
 
-        # Take actions. As many actions as (hospitals + 1) X gravity categories X hospitals
+        # Take actions. As many actions as (hospitals + 1) X severity categories X hospitals
         start_hospitals, end_hospitals = action
-        for gravity, queue in enumerate(self.active_emergencies):
-            start_hospital = self.hospitals[start_hospitals[gravity]]
-            end_hospital = self.hospitals[end_hospitals[gravity]]
-            if gravity == 0:  # Dummy gravity to move ambulances between hospitals
+        for severity, queue in enumerate(self.active_emergencies):
+            start_hospital = self.hospitals[start_hospitals[severity]]
+            end_hospital = self.hospitals[end_hospitals[severity]]
+            if severity == 0:  # Dummy severity to move ambulances between hospitals
                 self.hospitals[start_hospital]["available_amb"] -= 1
                 tthospital = self._displacement_time(start_hospital["loc"], end_hospital["loc"])
                 ambulance = self.moving_amb(self.time, self.time + tthospital, end_hospital, 0)
                 self.incoming_ambulances.append(ambulance)
                 continue
-            if len(queue) == 0:  # If the queue for this gravity level is empty, no action
+            if len(queue) == 0:  # If the queue for this severity level is empty, no action
                 continue
             if start_hospital["name"] == "null":  # Starting hospital #0 simbolizes null action
                 continue
@@ -194,12 +191,15 @@ class CitySim(gym.Env):
 
             # Launch an ambulance from start hospital towards emergency
             self.hospitals[start_hospital]["avail_amb"] -= 1
-            emergency = self.active_emergencies[gravity].popleft()
+            emergency = self.active_emergencies[severity].popleft()
             ttobj = self._displacement_time(start_hospital["loc"], emergency["loc"])
             tthospital = self._displacement_time(emergency["loc"], end_hospital["loc"]) + ttobj
-            time_diff = emergency["tfailure"] - (self.time + ttobj)
+            time_diff = -ttobj
             ambulance = self.moving_amb(
-                self.time + ttobj, self.time + tthospital, end_hospital, self._reward_f(time_diff)
+                self.time + ttobj,
+                self.time + tthospital,
+                end_hospital,
+                self._reward_f(time_diff, severity),
             )
 
             self.outgoing_ambulances.append(ambulance)
@@ -222,8 +222,9 @@ class CitySim(gym.Env):
 
         self.hospitals = config["hospitals"]
         self.districts = config["districts"]
-        self.emergency_levels = config["emergency_levels"]
-        self.shown_emergencies_per_gravity = config["shown_emergencies_per_gravity"]
+        self.severity_levels = config["severity_levels"]
+        self.severity_dists = config["severity_dists"]
+        self.shown_emergencies_per_severity = config["shown_emergencies_per_severity"]
 
     def _get_obs(self):
         """Build the part of the state that the agent can know about.
@@ -237,68 +238,100 @@ class CitySim(gym.Env):
         # id x y avail_amb incoming_amb ttamb
         hospitals_table = []
         for id in self.hospitals:
-            x, y = self.hospitals[id]["loc"]
+            x, y, district = self.hospitals[id]["loc"]
             incoming = 0
             for ambulance in self.outgoing_ambulances + self.incoming_ambulances:
                 if ambulance["destination"] == id:
                     incoming += 1
-            hospital_data = [id, x, y, self.hospitals[id]["avail_amb"], incoming]
+            hospital_data = [id, x, y, district, self.hospitals[id]["avail_amb"], incoming]
             hospitals_table.append(hospital_data)
         observation.append(np.array(hospitals_table))
 
-        # Unattended emergencies, with locations and gravity. 3D table in gravity/order/data
-        # Data for each emergency is gravity order time_active x y
+        # Unattended emergencies, with locations and severity. 3D table in severity/order/data
+        # Data for each emergency is severity order time_active x y
         emergencies_table = []
-        for gravity, queue in enumerate(self.active_emergencies):
-            gravity_table = []
-            if gravity == 0:
+        for severity, queue in enumerate(self.active_emergencies):
+            severity_table = []
+            if severity == 0:
                 continue
-            for order in range(self.shown_emergencies_per_gravity):
+            for order in range(self.shown_emergencies_per_severity):
                 if order < len(queue):
                     emergency = queue[order]
-                    x, y = emergency["loc"]
+                    x, y, district = emergency["loc"]
                     tactive = int((self.time - emergency["tappearance"]) / self.time_step)
-                    emergency_data = [gravity, order, tactive, x, y]
+                    emergency_data = [severity, order, tactive, x, y, district]
                 else:
-                    emergency_data = [0, order, 0, 0, 0]
-                gravity_table.append(emergency_data)
-            emergencies_table.append(gravity_table)
+                    emergency_data = [0, order, 0, 0, 0, 0]
+                severity_table.append(emergency_data)
+            emergencies_table.append(severity_table)
         observation.append(np.array(emergencies_table))
 
         # Districts data?
+
+        # Time data
+        time_data = np.array(
+            [
+                self.time_step_seconds,  # Information about potential reaction time
+                self.time.month,
+                self.time.day,
+                self.time.weekday() + 1,
+                self.time.hour,
+                self.time.minute,
+            ]
+        )
+        observation.append(time_data)
 
         return observation
 
     def _generate_emergencies(self):
         """For given city parameters and time, generate appropriate emergencies for a timestep.
 
-        Emergencies come predefined with the time to failure, which is softly correlated to gravity.
+        Emergencies come predefined with the time to failure, which is softly correlated to severity.
 
-        The agent only knows about the location, gravity and the time since it was generated.
+        The agent only knows about the location, severity and the time since it was generated.
         """
 
-        # por nivel de gravedad:
-        #   distribución por hora (resolución del orden de hora)
-        #   distribución por día de la semana
-        #   distribución por semana del año
-        #   distribución por distrito
+        hour = self.time.hour
+        weekday = self.time.weekday() + 1
+        month = self.time.month
 
-        # DUMMY GENERATOR; TO BE COMPLETED
-        for gravity in range(1, self.emergency_levels + 1):
-            if np.random.rand() > 0.1 * self.stress:
-                location = (1, 1)
-                tapearance = self.time
-                tfailure = self.time + timedelta(minutes=30)
+        for severity in range(1, self.severity_levels + 1):
+            base_frequency = self.severity_dists[severity]["frequency"]
+            current_frequency = (
+                base_frequency
+                * self.severity_levels[severity]["hourly_dist"][hour]
+                * self.severity_levels[severity]["daily_dist"][weekday]
+                * self.severity_levels[severity]["monthly_dist"][month]
+            )
 
-                emergency = self.emergency(location, gravity, tapearance, tfailure)
-                self.active_emergencies[gravity].append(emergency)
-        pass
+            # Assuming independent distributions per hour, weekday and month
+            period_frequency = current_frequency * self.time_step_seconds  # Avg events per step
 
-    def _displacement_time(
-        self, start, end
-    ):  # (x1, y1) (x2, y2)  [km], centro Puerta del Sol, x -> Este, y -> Norte
+            # Poisson distribution of avg # of emergencies in period will give number of new ones
+            num_new_emergencies = int(np.random.poisson(period_frequency, 1))
+
+            if num_new_emergencies == 0:
+                continue
+
+            # Get the district weights for the current severity
+            probs_dict = self.severity_levels[severity]["district_prob"]
+            district_weights = np.array([w for district, w in sorted(probs_dict.items())])
+            district_weights = district_weights / district_weights.sum()
+
+            for _ in range(num_new_emergencies):  # Skipped if 0 new emergencies
+                district = np.random.choice(  # District where emergency will be located
+                    np.arange(len(district_weights)) + 1, p=district_weights
+                )
+                loc = (0.0, 0.0, district)
+                tappearance = self.time
+                emergency = self.emergency(loc, severity, tappearance)
+                self.active_emergencies[severity].append(emergency)  # Add to queue
+
+    def _displacement_time(self, start, end):
         """Given start and end points, returns a displacement time between both locations for an 
         ambulance, based on the current traffic, metheorology, and randomness.
+
+        (x1, y1, district1) (x2, y2, district2)  [km], centro P. del Sol, x -> Este, y -> Norte
         """
 
         # DUMMY GENERATOR; TO BE COMPLETED
@@ -307,12 +340,7 @@ class CitySim(gym.Env):
 
         return carthesian_distance / speed  # Tiempo de desplazamiento [sec]
 
-    def _reward_f(self, time_diff):
+    def _reward_f(self, time_diff, severity):
         """Possible non-linear fuction to apply to the time difference between an ambulance arrival
         and the time reference of the emergency in order to calculate a reward for the agent."""
-        return time_diff  # Right now we will keep it linear with reaction time to emergency
-
-
-city = CitySim()
-f = open("city_defaults.yaml", "w+")
-yaml.dump(city.defaults, f, allow_unicode=True)
+        return time_diff * severity  # Right now linear with time to emergency and severity
