@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# pylint: disable=unbalanced-tuple-unpacking
 """
 Gym environment for simulating the development of emergencies requiring ambulance in a city.
 
@@ -198,13 +199,13 @@ class CitySim(gym.Env):
         # Hospitals table
         # id x y available_amb incoming_amb ttamb
         hospitals_table = []
-        for id in self.hospitals:
-            x, y, district = self.hospitals[id]["loc"]
+        for id, hospital in self.hospitals.items():
+            x, y, district = hospital["loc"]
             incoming = 0
             for ambulance in self.outgoing_ambulances + self.incoming_ambulances:
                 if ambulance["destination"] == id:
                     incoming += 1
-            hospital_data = [id, x, y, district, self.hospitals[id]["available_amb"], incoming]
+            hospital_data = [id, x, y, district, hospital["available_amb"], incoming]
             hospitals_table.append(hospital_data)
         observation.append(np.array(hospitals_table))
 
@@ -263,6 +264,7 @@ class CitySim(gym.Env):
                 * self.severity_levels[severity]["hourly_dist"][hour]
                 * self.severity_levels[severity]["daily_dist"][weekday]
                 * self.severity_levels[severity]["monthly_dist"][month]
+                * self.stress
             )
 
             # Assuming independent distributions per hour, weekday and month
