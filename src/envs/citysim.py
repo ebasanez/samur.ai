@@ -20,6 +20,8 @@ import calendar
 from collections import defaultdict, deque, namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
+import geopandas as gpd
+from shapely.geometry import Polygon, Point
 
 import gym
 import numpy as np
@@ -93,7 +95,8 @@ class CitySim(gym.Env):
 
     def __init__(
         self,
-        city_config="city_defaults.yaml",  # YAML file w/ city and generator data
+        city_config="data/city_defaults.yaml",  # YAML file w/ city and generator data
+        city_geometry="data/madrid_districs_processed.shp",
         time_step: int = 60,
         stress: float = 1.0,
     ):
@@ -112,11 +115,12 @@ class CitySim(gym.Env):
 
         # Read configuration file for setting up the city
         if type(city_config) is dict:
-            self._configure(city_config)
+            config = city_config
         else:
             with open(city_config) as config_file:
                 config = yaml.safe_load(config_file)
-                self._configure(config)
+        geometry = gpd.read_file(city_geometry)
+        self._configure(config, geometry)
 
     def seed(self, seed):
         np.random.seed(seed)
@@ -217,7 +221,7 @@ class CitySim(gym.Env):
         """Modify the stress factor at any moment in the execution."""
         self.stress = stress
 
-    def _configure(self, config):
+    def _configure(self, config, geometry):
         """Set the city information variables to the configuration."""
 
         self.hospitals = config["hospitals"]
@@ -225,6 +229,8 @@ class CitySim(gym.Env):
         self.severity_levels = config["severity_levels"]
         self.severity_dists = config["severity_dists"]
         self.shown_emergencies_per_severity = config["shown_emergencies_per_severity"]
+
+        self.geo_df = geometry
 
     def _get_obs(self):
         """Build the part of the state that the agent can know about.
@@ -322,7 +328,7 @@ class CitySim(gym.Env):
                 district = np.random.choice(  # District where emergency will be located
                     np.arange(len(district_weights)) + 1, p=district_weights
                 )
-                loc = (0.0, 0.0, district)
+                loc = self._random_loc_in_distric(district)
                 tappearance = self.time
                 emergency = self.emergency(loc, severity, tappearance)
                 self.active_emergencies[severity].append(emergency)  # Add to queue
@@ -339,6 +345,19 @@ class CitySim(gym.Env):
         speed = np.random.normal(1, 0.3)
 
         return carthesian_distance / speed  # Tiempo de desplazamiento [sec]
+
+    def _get_random_point_in_polygon(self, polygon):
+        min_x, min_y, max_x, max_y = polygon.bounds
+        while True:
+            point = Point(np.random.uniform(min_x, max_x), np.random.uniform(min_y, max_y))
+            if polygon.contains(point):
+                return point
+
+    def _random_loc_in_distric(self, district_code):
+        polygon = self.geo_df.loc[district_code]["geometry"]
+        point = self._get_random_point_in_polygon(polygon)
+        x, y = np.array(point.coords).flatten().tolist()
+        return (x, y, district_code)
 
     def _reward_f(self, time_diff, severity):
         """Possible non-linear fuction to apply to the time difference between an ambulance arrival
