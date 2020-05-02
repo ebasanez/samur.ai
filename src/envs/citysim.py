@@ -47,51 +47,6 @@ class CitySim(gym.Env):
         "render.modes": ["rgb_array", "console"],
         "video.frames_per_second": 30,
     }
-    defaults = {
-        "hospitals": {
-            0: {"name": "AAA", "x": 0.0, "y": 0.0},
-            1: {"name": "Central de la Defensa", "x": -3.849, "y": -2.765},
-            2: {"name": "Clínico San Carlos", "x": -1.593, "y": 2.937},
-            3: {"name": "Concepción (Fund. J. Díaz)", "x": -1.596, "y": 2.718},
-            4: {"name": "Doce de Octubre", "x": 0.147, "y": -4.271},
-            5: {"name": "Doctor Rodriguez Lafora", "x": 0.786, "y": 13.054},
-            6: {"name": "Gregorio Marañón", "x": 2.59, "y": 0.523},
-            7: {"name": "Infanta Leonor", "x": 7.038, "y": -3.105},
-            8: {"name": "La Paz", "x": 1.13, "y": 7.416},
-            9: {"name": "La Princesa", "x": 2.181, "y": 2.189},
-            10: {"name": "Moncloa (ASISA)", "x": -2.914, "y": 2.06},
-            11: {"name": "Niño Jesús (Infantil)", "x": 2.123, "y": 0.007},
-            12: {"name": "Puerta de Hierro", "x": -14.652, "y": 3.992},
-            13: {"name": "Ramón y Cajal", "x": 0.5, "y": 8.142},
-            14: {"name": "Santa Cristina", "x": 2.553, "y": 0.821},
-            15: {"name": "Virgen de la torre", "x": 6.956, "y": -3.685},
-        },
-        "districts": {
-            1: {"name": "CENTRO", "surface": 5.21, "density": 25340.69},
-            2: {"name": "ARGANZUELA", "surface": 6.52, "density": 23306.44},
-            3: {"name": "RETIRO", "surface": 5.42, "density": 21867.53},
-            4: {"name": "SALAMANCA", "surface": 5.36, "density": 26830.78},
-            5: {"name": "CHAMARTIN", "surface": 9.12, "density": 15723.25},
-            6: {"name": "TETUAN", "surface": 5.37, "density": 28664.25},
-            7: {"name": "CHAMBERI", "surface": 4.73, "density": 29049.26},
-            8: {"name": "FUENCARRAL", "surface": 238.0, "density": 1003},
-            9: {"name": "MONCLOA", "surface": 46.47, "density": 2515.26},
-            10: {"name": "LATINA", "surface": 25.47, "density": 9183.75},
-            11: {"name": "CARABANCHEL", "surface": 14.1, "density": 17316.88},
-            12: {"name": "USERA", "surface": 7.7, "density": 17535.32},
-            13: {"name": "VALLECAS PTE.", "surface": 14.84, "density": 15345.01},
-            14: {"name": "MORATALAZ", "surface": 6.08, "density": 15493.59},
-            15: {"name": "CIUDAD LINEAL", "surface": 11.52, "density": 18455.56},
-            16: {"name": "HORTALEZA", "surface": 25.87, "density": 6973.33},
-            17: {"name": "VILLAVERDE", "surface": 20.21, "density": 7059.13},
-            18: {"name": "VILLA DE VALLECAS", "surface": 51.49, "density": 2026.82},
-            19: {"name": "VICALVARO", "surface": 35.36, "density": 1981.11},
-            20: {"name": "SAN BLAS", "surface": 22.26, "density": 6934.37},
-            21: {"name": "BARAJAS", "surface": 43.56, "density": 1076.06},
-        },
-        "severity_levels": 5,
-        "shown_emergencies_per_severity": 20,
-    }
 
     def __init__(
         self,
@@ -107,7 +62,7 @@ class CitySim(gym.Env):
         self.stress = stress
 
         # Named lists for status keeping
-        self.hospital = recordclass("Hospital", ["name", "loc", "avail_amb"])
+        self.hospital = recordclass("Hospital", ["name", "loc", "available_amb"])
         self.emergency = recordclass("Emergency", ["loc", "severity", "tappearance"])
         self.moving_amb = recordclass(
             "MovingAmbulance", ["tobjective", "thospital", "destination", "reward"]
@@ -167,7 +122,7 @@ class CitySim(gym.Env):
         new_incoming = []
         for ambulance in self.incoming_ambulances:
             if self.time >= ambulance["thospital"]:
-                self.hospitals[ambulance["destination"]]["avail_amb"] += 1
+                self.hospitals[ambulance["destination"]]["available_amb"] += 1
             else:
                 new_outgoing.append(ambulance)
         self.incoming_ambulances = new_incoming
@@ -187,14 +142,14 @@ class CitySim(gym.Env):
                 continue
             if start_hospital["name"] == "null":  # Starting hospital #0 simbolizes null action
                 continue
-            if start_hospital["avail_amb"] == 0:  # No ambulances, no action
+            if start_hospital["available_amb"] == 0:  # No ambulances, no action
                 continue
 
             if end_hospital["name"] == "null":  # Null end hospital to return to start hospital
                 end_hospital = start_hospital
 
             # Launch an ambulance from start hospital towards emergency
-            self.hospitals[start_hospital]["avail_amb"] -= 1
+            self.hospitals[start_hospital]["available_amb"] -= 1
             emergency = self.active_emergencies[severity].popleft()
             ttobj = self._displacement_time(start_hospital["loc"], emergency["loc"])
             tthospital = self._displacement_time(emergency["loc"], end_hospital["loc"]) + ttobj
@@ -241,7 +196,7 @@ class CitySim(gym.Env):
         observation = []
 
         # Hospitals table
-        # id x y avail_amb incoming_amb ttamb
+        # id x y available_amb incoming_amb ttamb
         hospitals_table = []
         for id in self.hospitals:
             x, y, district = self.hospitals[id]["loc"]
@@ -249,7 +204,7 @@ class CitySim(gym.Env):
             for ambulance in self.outgoing_ambulances + self.incoming_ambulances:
                 if ambulance["destination"] == id:
                     incoming += 1
-            hospital_data = [id, x, y, district, self.hospitals[id]["avail_amb"], incoming]
+            hospital_data = [id, x, y, district, self.hospitals[id]["available_amb"], incoming]
             hospitals_table.append(hospital_data)
         observation.append(np.array(hospitals_table))
 
