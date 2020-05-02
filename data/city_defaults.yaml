@@ -86,66 +86,82 @@ districts:
 severity_levels: 5
 hospitals:
   0:
+    available_amb: 2
     name: AAA
     x: 0.0
     y: 0.0
   1:
+    available_amb: 2
     name: Central de la Defensa
     x: -3.849
     y: -2.765
   2:
+    available_amb: 2
     name: Clínico San Carlos
     x: -1.593
     y: 2.937
   3:
+    available_amb: 2
     name: Concepción (Fund. J. Díaz)
     x: -1.596
     y: 2.718
   4:
+    available_amb: 2
     name: Doce de Octubre
     x: 0.147
     y: -4.271
   5:
+    available_amb: 2
     name: Doctor Rodriguez Lafora
     x: 0.786
     y: 13.054
   6:
+    available_amb: 2
     name: Gregorio Marañón
     x: 2.59
     y: 0.523
   7:
+    available_amb: 2
     name: Infanta Leonor
     x: 7.038
     y: -3.105
   8:
+    available_amb: 2
     name: La Paz
     x: 1.13
     y: 7.416
   9:
+    available_amb: 2
     name: La Princesa
     x: 2.181
     y: 2.189
   10:
+    available_amb: 2
     name: Moncloa (ASISA)
     x: -2.914
     y: 2.06
   11:
+    available_amb: 2
     name: Niño Jesús (Infantil)
     x: 2.123
     y: 0.007
   12:
+    available_amb: 2
     name: Puerta de Hierro
     x: -14.652
     y: 3.992
   13:
+    available_amb: 2
     name: Ramón y Cajal
     x: 0.5
     y: 8.142
   14:
+    available_amb: 2
     name: Santa Cristina
     x: 2.553
     y: 0.821
   15:
+    available_amb: 2
     name: Virgen de la torre
     x: 6.956
     y: -3.685
