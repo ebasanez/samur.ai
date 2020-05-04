@@ -3,6 +3,8 @@ import DatasetPaths
 import numpy as np
 from decimal import Decimal
 
+NUMBER_OF_AMBULANCES = 90
+
 LATITUDE_1DEG_KM = 110.574
 LONGITUDE_KM_PER_DEG = 111.320
 KM0_LATITUDE = 40.4146500

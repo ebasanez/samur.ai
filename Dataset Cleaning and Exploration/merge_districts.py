@@ -8,7 +8,6 @@ def merge_districts(df_samur, df_districts):
 	df = pd.merge(df_samur, df_districts, left_on='Distrito', right_on='DATASET_SAMUR')
 	df.drop(columns=['DATASET_SAMUR'],inplace = True)
 	df.rename(columns={'codigo':'Distrito_codigo'},inplace = True)
-	df['Distrito_codigo_corto'] = df['Distrito_codigo'] % 100
 	df.sort_values(by = 'Solicitud',inplace = True);	
 	return df
 

@@ -16,9 +16,7 @@ class CentroMedicoOpenChecker:
 		
 	def getNumCentrosMedicosOpen(self, district, datetimeStr):
 		dt = datetime.strptime(datetimeStr,'%Y-%m-%d %H:%M:%S');
-		#d = self.df[self.df['DISTRITO'] == district]
 		d = self.df[(self.df['DISTRITO'] == district) & (self._is_open_vectorized(self.df['TIME'],dt))]
-		#d = self.df[self._is_open(self.df.TIME,dt)]
 		self.df.DISTRITO = self.df.DISTRITO.astype(str)
 		return d.shape[0]
 

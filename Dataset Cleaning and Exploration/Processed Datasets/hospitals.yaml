@@ -1,0 +1,112 @@
+- 0:
+    available_amb: 0
+    loc:
+      district_code: 0
+      x: 0.0
+      y: 0.0
+    name: NaN
+- 1:
+    available_amb: 4
+    loc:
+      district_code: 11
+      x: -3.847831
+      y: -2.76461
+    name: Central de la Defensa
+- 2:
+    available_amb: 11
+    loc:
+      district_code: 9
+      x: -1.593745
+      y: 2.9369810000000003
+    name: Clínico San Carlos
+- 3:
+    available_amb: 14
+    loc:
+      district_code: 9
+      x: -1.596115
+      y: 2.718236
+    name: Concepción (Fund. J. Díaz)
+- 4:
+    available_amb: 13
+    loc:
+      district_code: 12
+      x: 0.147072
+      y: -4.271244
+    name: Doce de Octubre
+- 5:
+    available_amb: 0
+    loc:
+      district_code: 8
+      x: 0.787093
+      y: 13.054273
+    name: Doctor Rodriguez Lafora
+- 6:
+    available_amb: 15
+    loc:
+      district_code: 3
+      x: 2.5903110000000003
+      y: 0.522674
+    name: Gregorio Marañón
+- 7:
+    available_amb: 5
+    loc:
+      district_code: 18
+      x: 7.035236
+      y: -3.105459
+    name: Infanta Leonor
+- 8:
+    available_amb: 11
+    loc:
+      district_code: 8
+      x: 1.130853
+      y: 7.4158479999999996
+    name: La Paz
+- 9:
+    available_amb: 7
+    loc:
+      district_code: 4
+      x: 2.181863
+      y: 2.1890009999999998
+    name: La Princesa
+- 10:
+    available_amb: 0
+    loc:
+      district_code: 9
+      x: -2.91519
+      y: 2.05989
+    name: Moncloa (ASISA)
+- 11:
+    available_amb: 1
+    loc:
+      district_code: 3
+      x: 2.123102
+      y: 0.006561
+    name: Niño Jesús (Infantil)
+- 12:
+    available_amb: 0
+    loc:
+      district_code: 8
+      x: -14.659776
+      y: 3.9915580000000004
+    name: Puerta de Hierro
+- 13:
+    available_amb: 9
+    loc:
+      district_code: 8
+      x: 0.500993
+      y: 8.142031
+    name: Ramón y Cajal
+- 14:
+    available_amb: 0
+    loc:
+      district_code: 4
+      x: 2.553649
+      y: 0.820709
+    name: Santa Cristina
+- 15:
+    available_amb: 0
+    loc:
+      district_code: 18
+      x: 6.953021000000001
+      y: -3.684515
+    name: Virgen de la torre
