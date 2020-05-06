@@ -121,7 +121,7 @@ def main(dir_historical, dir_points):
 
         os.remove(unzipped)
 
-    df_global.to_csv('traffic_data.csv')
+    df_global.sort_values('fecha').to_csv('traffic_data.csv', sep=SEP, index=False)
 
 def usage():
     print('Usage: {} <historical_dir> <points_dir>')
@@ -131,8 +131,6 @@ def usage():
     sys.exit(-1)
 
 if __name__ == '__main__':
-#    main()
-#    main2()
     if len(sys.argv) != 3:
         usage()
 
