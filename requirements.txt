@@ -1,0 +1,7 @@
+Shapely==1.7.0
+gym==0.15.6
+recordclass==0.13.2
+numpy==1.17.2
+geopandas==0.7.0
+pandas==0.25.1
+PyYAML==5.3.1
