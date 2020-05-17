@@ -1,0 +1,23 @@
+name_orig,Hospital,latitude,longitude,postal_code,type_road,road,number,district_code,hospital_x,hospital_y
+Concepción (Fund. J. Díaz),Concepción (Fund. J. Díaz),40.439093,-3.719251,28040.0,Avda.,Reyes Católicos,2,9,-1.596115,2.718236
+Doce de Octubre,Doce de Octubre,40.376242,-3.698663,28041.0,Avda.,Córdoba,s/n,12,0.147072,-4.271244
+Clínico San Carlos,Clínico San Carlos,40.44106,-3.719223,28040.0,Calle,Profesor Martín Lagos,s/n,9,-1.593745,2.936981
+INFANTA LEONOR,Infanta Leonor,40.386725,-3.61731,28031.0,Avda.,Este,80,18,7.035236,-3.105459
+Gregorio Marañón,Gregorio Marañón,40.41935,-3.669807,28009.0,Calle, Doctor Esquerdo,46,3,2.590311,0.522674
+Central de la Defensa,Central de la Defensa,40.38979000000001,-3.745845,28047.0,Glorieta,Ejército,1,11,-3.847831,-2.76461
+Ramón y Cajal,Ramón y Cajal,40.487865,-3.694483,28034.0,Carretera,M-607,km. 9,8,0.500993,8.142031
+La Paz,La Paz,40.481335,-3.687044,28046.0,Paseo,Castellana,261,8,1.130853,7.415848
+La Princesa,La Princesa,40.434334,-3.674631,28006.0,Calle,Diego de León,62,4,2.181863,2.189001
+Niño Jesús (Infantil),Niño Jesús (Infantil),40.414709,-3.675325,28009.0,Avda.,Menéndez Pelayo,65,3,2.123102,0.006561
+Getafe,Getafe,40.312814,-3.741744,28905.0,Carretera,A-43,km. 12.500,-1,-3.500599,-11.324891
+Doctor Rodriguez Lafora,Doctor Rodriguez Lafora,40.532037,-3.691104,28049.0,Carretra,M-607,13.000,8,0.787093,13.054273
+Centros Municipales (Asist. y  Albergues),Centros Municipales (Asist. y Albergues),,,,,,,-1,,
+Centros Municipales (Asist. y Albergues),Centros Municipales (Asist. y Albergues),,,,,,,-1,,
+SANTA CRISTINA,Santa Cristina,40.42203,-3.67024,28009.0,Calle,Maestro Vives,2,4,2.553649,0.820709
+Puerta de Hierro,Puerta de Hierro,40.450543,-3.87354,28222.0,Calle,Joaquín Rodrigo,1,8,-14.659776,3.991558
+Otros Centros Públicos,Otros Centros Públicos,,,,,,,-1,,
+VIRGEN DE LA TORRE,Virgen de la torre,40.381518,-3.618281,28031.0,Calle,Puerto de Lumbreras,5,18,6.953021,-3.684515
+"Militares (Aire,Polic. Naval, Otros...)","Militares (Aire,Polic. Naval, Otros...)",,,,,,,-1,,
+Alcalá de Henares (Ppe. de Asturias),Alcalá de Henares (Ppe. de Asturias),40.50988,-3.347778,28805.0,Carretera,Alcalá,s/n,-1,29.856529,10.590256
+Moncloa (ASISA),Moncloa (ASISA),40.433173,-3.73483,28008.0,Calle,Aniceto Mariñas,116,9,-2.91519,2.05989
+No derivado,No derivado,,,,,,,-1,,
