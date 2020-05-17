@@ -104,7 +104,7 @@ hospitals:
     loc:
       district_code: 9
       x: -1.593745
-      y: 2.9369810000000003
+      y: 2.9369810
     name: Clínico San Carlos
   3:
     available_amb: 14
@@ -131,7 +131,7 @@ hospitals:
     available_amb: 15
     loc:
       district_code: 3
-      x: 2.5903110000000003
+      x: 2.590311
       y: 0.522674
     name: Gregorio Marañón
   7:
@@ -146,14 +146,14 @@ hospitals:
     loc:
       district_code: 8
       x: 1.130853
-      y: 7.4158479999999996
+      y: 7.4158478
     name: La Paz
   9:
     available_amb: 7
     loc:
       district_code: 4
       x: 2.181863
-      y: 2.1890009999999998
+      y: 2.189001
     name: La Princesa
   10:
     available_amb: 0
@@ -174,7 +174,7 @@ hospitals:
     loc:
       district_code: 8
       x: -14.659776
-      y: 3.9915580000000004
+      y: 3.99155800
     name: Puerta de Hierro
   13:
     available_amb: 9
@@ -194,7 +194,7 @@ hospitals:
     available_amb: 0
     loc:
       district_code: 18
-      x: 6.953021000000001
+      x: 6.9530210
       y: -3.684515
     name: Virgen de la torre
 
