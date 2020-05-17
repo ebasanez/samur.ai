@@ -22,7 +22,15 @@ from collections import defaultdict, deque, namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
 import geopandas as gpd
-from shapely.geometry import Polygon, Point
+from shapely.geometry import (
+    Polygon,
+    Point,
+    MultiPolygon,
+    LinearRing,
+    MultiLineString,
+    MultiPoint,
+    LineString,
+)
 
 import gym
 import numpy as np
@@ -30,6 +38,8 @@ import yaml
 from gym import spaces
 from gym.utils import seeding
 from recordclass import recordclass
+
+from traffic_manager import TrafficManager
 
 
 class CitySim(gym.Env):
@@ -52,7 +62,7 @@ class CitySim(gym.Env):
     def __init__(
         self,
         city_config="data/city_defaults.yaml",  # YAML file w/ city and generator data
-        city_geometry="data/madrid_districs_processed.shp",
+        city_geometry="data/madrid_districs_processed/madrid_districs_processed.shp",
         time_step: int = 60,
         stress: float = 1.0,
     ):
@@ -98,12 +108,16 @@ class CitySim(gym.Env):
         self.outgoing_ambulances = []
         self.incoming_ambulances = []
 
-        # TODO: Reset hospital available ambulances
+        self.traffic_manager = TrafficManager(self.time, self.districts)
+
+        for i in self.hospitals.keys():
+            self.hospitals[i]["available_amb"] = self.config["hospitals"][i]["available_amb"]
 
     def step(self, action):
 
         # Advance time
         self.time += self.time_step
+        self.traffic_manager.update_traffic(self.time)
 
         # Generate new emergencies. Emergencies are a series of FIFO lists, one per severity
         self._generate_emergencies()
@@ -179,6 +193,8 @@ class CitySim(gym.Env):
 
     def _configure(self, config, geometry):
         """Set the city information variables to the configuration."""
+
+        self.config = config
 
         self.hospitals = config["hospitals"]
         self.districts = config["districts"]
@@ -297,11 +313,15 @@ class CitySim(gym.Env):
         (x1, y1, district1) (x2, y2, district2)  [km], centro P. del Sol, x -> Este, y -> Norte
         """
 
-        # DUMMY GENERATOR; TO BE COMPLETED
-        carthesian_distance = abs(start[0] - end[0]) + abs(start[1] - end[1])
-        speed = np.random.normal(1, 0.3)
+        x_start, y_start, district_start = start
+        x_end, y_end, district_end = end
 
-        return carthesian_distance / speed  # Tiempo de desplazamiento [sec]
+        distance_per_district = self._get_segments_per_district(
+            district_start, (x_start, y_start), district_end, (x_end, y_end)
+        )
+        total_time = self.traffic_manager.displacement_time(distance_per_district, self.time)
+
+        return total_time  # Tiempo de desplazamiento [sec]
 
     def _get_random_point_in_polygon(self, polygon):
         min_x, min_y, max_x, max_y = polygon.bounds
@@ -316,7 +336,54 @@ class CitySim(gym.Env):
         x, y = np.array(point.coords).flatten().tolist()
         return (x, y, district_code)
 
+    def _obtain_route_cuts(self, origin, destination):
+        route = LineString([Point(origin[0], origin[1]), Point(destination[0], destination[1])])
+
+        cuts = {}  # Dict with {district_code: list of (x, y) tuples},
+        for district_code, district_row in self.geo_df.iterrows():
+            distric_geo = district_row["geometry"]
+            # To allow handling more than 2 intersection points between route line and polygon
+            distric_lr = LinearRing(list(distric_geo.exterior.coords))
+            intersection = distric_lr.intersection(route)
+            # Intersects district in ONE point
+            if type(intersection) == Point:
+                cuts[district_code] = [(intersection.x, intersection.y)]
+            # Intersects district in TWO OR MORE points
+            if type(intersection) == MultiPoint:
+                cuts[district_code] = [(point.x, point.y) for point in intersection]
+
+        return cuts
+
+    # Calculate distances traversed across districts
+    def _get_segments_per_district(
+        self, district_origin, origin, district_destination, destination
+    ):
+        cuts = self._obtain_route_cuts(origin, destination)
+        # Add points at start and end corresponding to the origin and destination
+        cuts[district_origin].insert(0, origin)
+        cuts[district_destination].append(destination)
+
+        distances = {k: self._cartesian(*v) for (k, v) in cuts.items()}
+        distances["Missing"] = self._cartesian(origin, destination) - sum(distances.values())
+
+        return distances
+
+    def _cartesian(self, *kwargs):
+        """Given a series of points in th Cartesian plane, returns the sums of the distances 
+        between consecutive pairs of such points. There must be an even number of points.
+        """
+        if len(kwargs) % 2 != 0:
+            return 0
+        result = 0
+        for i in range(0, len(kwargs), 2):
+            p1 = kwargs[i]
+            p2 = kwargs[i + 1]
+            result += np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+
+        return result
+
     def _reward_f(self, time_diff, severity):
         """Possible non-linear fuction to apply to the time difference between an ambulance arrival
-        and the time reference of the emergency in order to calculate a reward for the agent."""
+        and the time reference of the emergency in order to calculate a reward for the agent.
+        """
         return time_diff * severity  # Right now linear with time to emergency and severity
