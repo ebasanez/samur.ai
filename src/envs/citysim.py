@@ -18,6 +18,7 @@ Created by Enrique Basañez, Miguel Blanco, Alfonso Lagares, Borja Menéndez and
 """
 
 import calendar
+import os
 from collections import defaultdict, deque, namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -39,7 +40,7 @@ from gym import spaces
 from gym.utils import seeding
 from recordclass import recordclass
 
-from traffic_manager import TrafficManager
+from .traffic_manager import TrafficManager
 
 
 class CitySim(gym.Env):
@@ -67,6 +68,8 @@ class CitySim(gym.Env):
         stress: float = 1.0,
     ):
         """Initialize the CitySim environment."""
+        assert os.path.isfile(city_config), "Invalid path for city configuration file"
+        assert os.path.isfile(city_geometry), "Invalid path for city geometry file"
 
         self.time_step_seconds = time_step
         self.time_step = timedelta(seconds=self.time_step_seconds)
@@ -112,6 +115,8 @@ class CitySim(gym.Env):
 
         for i in self.hospitals.keys():
             self.hospitals[i]["available_amb"] = self.config["hospitals"][i]["available_amb"]
+
+        return self._get_obs()
 
     def step(self, action):
 
