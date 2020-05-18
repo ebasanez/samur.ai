@@ -150,26 +150,31 @@ class CitySim(gym.Env):
         # Take actions. As many actions as (hospitals + 1) X severity categories X hospitals
         start_hospitals, end_hospitals = action
         for severity, queue in enumerate(self.active_emergencies):
-            start_hospital = self.hospitals[start_hospitals[severity]]
-            end_hospital = self.hospitals[end_hospitals[severity]]
+            start_hospital_id, end_hospital_id = start_hospitals[severity], end_hospitals[severity]
+            start_hospital = self.hospitals[start_hospital_id]
+            end_hospital = self.hospitals[end_hospital_id]
             if severity == 0:  # Dummy severity to move ambulances between hospitals
-                self.hospitals[start_hospital]["available_amb"] -= 1
+                if (end_hospital_id == 0) or (start_hospital_id == 0):
+                    continue  # Null hospitals would not make sense here
+                self.hospitals[start_hospital_id]["available_amb"] -= 1
                 tthospital = self._displacement_time(start_hospital["loc"], end_hospital["loc"])
-                ambulance = self.moving_amb(self.time, self.time + tthospital, end_hospital, 0)
+                ambulance = self.moving_amb(self.time, self.time + tthospital, end_hospital_id, 0)
                 self.incoming_ambulances.append(ambulance)
                 continue
-            if len(queue) == 0:  # If the queue for this severity level is empty, no action
+
+            if start_hospital_id == 0:  # Starting hospital #0 simbolizes null action
                 continue
-            if start_hospital["name"] == "null":  # Starting hospital #0 simbolizes null action
+            if len(queue) == 0:  # If the queue for this severity level is empty, no action
                 continue
             if start_hospital["available_amb"] == 0:  # No ambulances, no action
                 continue
 
-            if end_hospital["name"] == "null":  # Null end hospital to return to start hospital
+            if end_hospital_id == 0:  # Null end hospital to return to start hospital
+                end_hospital_id = start_hospital_id
                 end_hospital = start_hospital
 
             # Launch an ambulance from start hospital towards emergency
-            self.hospitals[start_hospital]["available_amb"] -= 1
+            self.hospitals[start_hospital_id]["available_amb"] -= 1
             emergency = self.active_emergencies[severity].popleft()
             ttobj = self._displacement_time(start_hospital["loc"], emergency["loc"])
             tthospital = self._displacement_time(emergency["loc"], end_hospital["loc"]) + ttobj
@@ -177,7 +182,7 @@ class CitySim(gym.Env):
             ambulance = self.moving_amb(
                 self.time + ttobj,
                 self.time + tthospital,
-                end_hospital,
+                end_hospital_id,
                 self._reward_f(time_diff, severity),
             )
 
@@ -207,7 +212,19 @@ class CitySim(gym.Env):
         self.severity_dists = config["severity_dists"]
         self.shown_emergencies_per_severity = config["shown_emergencies_per_severity"]
 
-        self.geo_df = geometry
+        self.geo_df = geometry.rename(columns={"district_c": "district_code"}).set_index(
+            "district_code"
+        )
+
+        # Correct possible discrepancies in hospital district data and geometry data
+        for hospital_id, hospital in self.hospitals.items():
+            point = Point(hospital["loc"]["x"], hospital["loc"]["y"])
+            hospital_district_code = 0
+            for district_code, row in self.geo_df.iterrows():
+                polygon = row["geometry"]
+                if polygon.contains(point):
+                    hospital_district_code = district_code
+            self.hospitals[hospital_id]["loc"]["district_code"] = hospital_district_code
 
     def _get_obs(self):
         """Build the part of the state that the agent can know about.
@@ -282,9 +299,9 @@ class CitySim(gym.Env):
             base_frequency = self.severity_dists[severity]["frequency"]
             current_frequency = (
                 base_frequency
-                * self.severity_levels[severity]["hourly_dist"][hour]
-                * self.severity_levels[severity]["daily_dist"][weekday]
-                * self.severity_levels[severity]["monthly_dist"][month]
+                * self.severity_dists[severity]["hourly_dist"][hour]
+                * self.severity_dists[severity]["daily_dist"][weekday]
+                * self.severity_dists[severity]["monthly_dist"][month]
                 * self.stress
             )
 
@@ -298,7 +315,7 @@ class CitySim(gym.Env):
                 continue
 
             # Get the district weights for the current severity
-            probs_dict = self.severity_levels[severity]["district_prob"]
+            probs_dict = self.severity_dists[severity]["district_prob"]
             district_weights = np.array([w for district, w in sorted(probs_dict.items())])
             district_weights = district_weights / district_weights.sum()
 
@@ -318,15 +335,15 @@ class CitySim(gym.Env):
         (x1, y1, district1) (x2, y2, district2)  [km], centro P. del Sol, x -> Este, y -> Norte
         """
 
-        x_start, y_start, district_start = start
-        x_end, y_end, district_end = end
-
         distance_per_district = self._get_segments_per_district(
-            district_start, (x_start, y_start), district_end, (x_end, y_end)
+            start["district_code"],
+            (start["x"], start["y"]),
+            end["district_code"],
+            (end["x"], end["y"]),
         )
         total_time = self.traffic_manager.displacement_time(distance_per_district, self.time)
 
-        return total_time  # Tiempo de desplazamiento [sec]
+        return timedelta(seconds=total_time)
 
     def _get_random_point_in_polygon(self, polygon):
         min_x, min_y, max_x, max_y = polygon.bounds
@@ -339,7 +356,7 @@ class CitySim(gym.Env):
         polygon = self.geo_df.loc[district_code]["geometry"]
         point = self._get_random_point_in_polygon(polygon)
         x, y = np.array(point.coords).flatten().tolist()
-        return (x, y, district_code)
+        return {"x": x, "y": y, "district_code": district_code}
 
     def _obtain_route_cuts(self, origin, destination):
         route = LineString([Point(origin[0], origin[1]), Point(destination[0], destination[1])])
@@ -356,7 +373,6 @@ class CitySim(gym.Env):
             # Intersects district in TWO OR MORE points
             if type(intersection) == MultiPoint:
                 cuts[district_code] = [(point.x, point.y) for point in intersection]
-
         return cuts
 
     # Calculate distances traversed across districts
@@ -364,6 +380,10 @@ class CitySim(gym.Env):
         self, district_origin, origin, district_destination, destination
     ):
         cuts = self._obtain_route_cuts(origin, destination)
+        # If may return empty for same origin and destination district, but it will need an entry
+        if len(cuts) == 0:
+            cuts[district_origin] = []
+
         # Add points at start and end corresponding to the origin and destination
         cuts[district_origin].insert(0, origin)
         cuts[district_destination].append(destination)
@@ -391,4 +411,4 @@ class CitySim(gym.Env):
         """Possible non-linear fuction to apply to the time difference between an ambulance arrival
         and the time reference of the emergency in order to calculate a reward for the agent.
         """
-        return time_diff * severity  # Right now linear with time to emergency and severity
+        return time_diff.seconds * severity  # Right now linear with time to emergency and severity
