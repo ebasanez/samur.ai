@@ -170,27 +170,20 @@ hospitals:
       y: 0.006561
     name: Niño Jesús (Infantil)
   12:
-    available_amb: 0
-    loc:
-      district_code: 8
-      x: -14.659776
-      y: 3.99155800
-    name: Puerta de Hierro
-  13:
     available_amb: 9
     loc:
       district_code: 8
       x: 0.500993
       y: 8.142031
     name: Ramón y Cajal
-  14:
+  13:
     available_amb: 0
     loc:
       district_code: 4
       x: 2.553649
       y: 0.820709
     name: Santa Cristina
-  15:
+  14:
     available_amb: 0
     loc:
       district_code: 18
