@@ -114,7 +114,7 @@ class CitySim(gym.Env):
         self.traffic_manager = TrafficManager(self.time, self.districts)
 
         for i in self.hospitals.keys():
-            self.hospitals[i]["available_amb"] = self.config["hospitals"][i]["available_amb"]
+            self.hospitals[i]["available_amb"] = self.initial_ambulances[i]
 
         return self._get_obs()
 
@@ -204,10 +204,10 @@ class CitySim(gym.Env):
     def _configure(self, config, geometry):
         """Set the city information variables to the configuration."""
 
-        self.config = config
+        self.config = config.copy()
 
-        self.hospitals = config["hospitals"]
-        self.districts = config["districts"]
+        self.hospitals = config["hospitals"].copy()
+        self.districts = config["districts"].copy()
         self.severity_levels = config["severity_levels"]
         self.severity_dists = config["severity_dists"]
         self.shown_emergencies_per_severity = config["shown_emergencies_per_severity"]
@@ -226,6 +226,12 @@ class CitySim(gym.Env):
                     hospital_district_code = district_code
             self.hospitals[hospital_id]["loc"]["district_code"] = hospital_district_code
 
+        # Store original state of available ambulances on its own
+        self.initial_ambulances = [
+            self.config["hospitals"][i]["available_amb"]
+            for i in range(len(self.config["hospitals"]))
+        ]
+
     def _get_obs(self):
         """Build the part of the state that the agent can know about.
 
@@ -238,12 +244,13 @@ class CitySim(gym.Env):
         # id x y available_amb incoming_amb ttamb
         hospitals_table = []
         for id, hospital in self.hospitals.items():
-            x, y, district = hospital["loc"]
+            x, y = hospital["loc"]["x"], hospital["loc"]["y"]
+            district_code = hospital["loc"]["district_code"]
             incoming = 0
             for ambulance in self.outgoing_ambulances + self.incoming_ambulances:
                 if ambulance["destination"] == id:
                     incoming += 1
-            hospital_data = [id, x, y, district, hospital["available_amb"], incoming]
+            hospital_data = [id, x, y, district_code, hospital["available_amb"], incoming]
             hospitals_table.append(hospital_data)
         observation.append(np.array(hospitals_table))
 
