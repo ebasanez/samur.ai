@@ -1,7 +1,10 @@
+Fiona==1.8.13.post1
+pandas==0.25.1
+numpy==1.17.2
+pytz==2019.3
 Shapely==1.7.0
 gym==0.15.6
 recordclass==0.13.2
-numpy==1.17.2
 geopandas==0.7.0
-pandas==0.25.1
 PyYAML==5.3.1
+solarpy==0.1.3

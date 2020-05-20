@@ -23,7 +23,9 @@ from collections import defaultdict, deque, namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
 import geopandas as gpd
+import fiona
 from shapely.geometry import (
+    shape,
     Polygon,
     Point,
     MultiPolygon,
@@ -88,7 +90,7 @@ class CitySim(gym.Env):
         else:
             with open(city_config) as config_file:
                 config = yaml.safe_load(config_file)
-        geometry = gpd.read_file(city_geometry)
+        geometry = fiona.open(city_geometry)
         self._configure(config, geometry)
 
     def seed(self, seed):
@@ -131,8 +133,8 @@ class CitySim(gym.Env):
         new_outgoing = []
         reward = 0
         for ambulance in self.outgoing_ambulances:
-            if self.time >= ambulance["tobjective"]:
-                reward += ambulance["reward"]
+            if self.time >= ambulance["tobjective"]:  # Ambulance arrived at emergency
+                reward += ambulance["reward"]  # Corresponding eward is assigned at this moment
                 self.incoming_ambulances.append(ambulance)
             else:
                 new_outgoing.append(ambulance)
@@ -178,7 +180,7 @@ class CitySim(gym.Env):
             emergency = self.active_emergencies[severity].popleft()
             ttobj = self._displacement_time(start_hospital["loc"], emergency["loc"])
             tthospital = self._displacement_time(emergency["loc"], end_hospital["loc"]) + ttobj
-            time_diff = -ttobj
+            time_diff = -ttobj.seconds
             ambulance = self.moving_amb(
                 self.time + ttobj,
                 self.time + tthospital,
@@ -212,16 +214,17 @@ class CitySim(gym.Env):
         self.severity_dists = config["severity_dists"]
         self.shown_emergencies_per_severity = config["shown_emergencies_per_severity"]
 
-        self.geo_df = geometry.rename(columns={"district_c": "district_code"}).set_index(
-            "district_code"
-        )
+        # Generate a {district_code: Polygon} dict from the fiona Collection loaded from the .shp
+        self.geo_dict = {
+            district["properties"]["district_c"]: shape(district["geometry"])
+            for district in geometry
+        }
 
         # Correct possible discrepancies in hospital district data and geometry data
         for hospital_id, hospital in self.hospitals.items():
             point = Point(hospital["loc"]["x"], hospital["loc"]["y"])
             hospital_district_code = 0
-            for district_code, row in self.geo_df.iterrows():
-                polygon = row["geometry"]
+            for district_code, polygon in self.geo_dict.items():
                 if polygon.contains(point):
                     hospital_district_code = district_code
             self.hospitals[hospital_id]["loc"]["district_code"] = hospital_district_code
@@ -264,9 +267,10 @@ class CitySim(gym.Env):
             for order in range(self.shown_emergencies_per_severity):
                 if order < len(queue):
                     emergency = queue[order]
-                    x, y, district = emergency["loc"]
+                    loc = emergency["loc"]
+                    x, y, district_code = loc["x"], loc["y"], loc["district_code"]
                     tactive = int((self.time - emergency["tappearance"]) / self.time_step)
-                    emergency_data = [severity, order, tactive, x, y, district]
+                    emergency_data = [severity, order, tactive, x, y, district_code]
                 else:
                     emergency_data = [0, order, 0, 0, 0, 0]
                 severity_table.append(emergency_data)
@@ -360,7 +364,7 @@ class CitySim(gym.Env):
                 return point
 
     def _random_loc_in_distric(self, district_code):
-        polygon = self.geo_df.loc[district_code]["geometry"]
+        polygon = self.geo_dict[district_code]
         point = self._get_random_point_in_polygon(polygon)
         x, y = np.array(point.coords).flatten().tolist()
         return {"x": x, "y": y, "district_code": district_code}
@@ -369,10 +373,9 @@ class CitySim(gym.Env):
         route = LineString([Point(origin[0], origin[1]), Point(destination[0], destination[1])])
 
         cuts = {}  # Dict with {district_code: list of (x, y) tuples},
-        for district_code, district_row in self.geo_df.iterrows():
-            distric_geo = district_row["geometry"]
+        for district_code, polygon in self.geo_dict.items():
             # To allow handling more than 2 intersection points between route line and polygon
-            distric_lr = LinearRing(list(distric_geo.exterior.coords))
+            distric_lr = LinearRing(list(polygon.exterior.coords))
             intersection = distric_lr.intersection(route)
             # Intersects district in ONE point
             if type(intersection) == Point:
@@ -418,4 +421,4 @@ class CitySim(gym.Env):
         """Possible non-linear fuction to apply to the time difference between an ambulance arrival
         and the time reference of the emergency in order to calculate a reward for the agent.
         """
-        return time_diff.seconds * severity  # Right now linear with time to emergency and severity
+        return time_diff * severity  # Right now linear with time to emergency and severity
