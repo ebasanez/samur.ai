@@ -22,8 +22,7 @@ import os
 from collections import defaultdict, deque, namedtuple
 from datetime import datetime, timedelta
 from pathlib import Path
-import geopandas as gpd
-import fiona
+import shapefile
 from shapely.geometry import (
     shape,
     Polygon,
@@ -90,7 +89,8 @@ class CitySim(gym.Env):
         else:
             with open(city_config) as config_file:
                 config = yaml.safe_load(config_file)
-        geometry = fiona.open(city_geometry)
+        with shapefile.Reader(str(city_geometry)) as sf:
+            geometry = sf.shapes()
         self._configure(config, geometry)
 
     def seed(self, seed):
@@ -214,11 +214,8 @@ class CitySim(gym.Env):
         self.severity_dists = config["severity_dists"]
         self.shown_emergencies_per_severity = config["shown_emergencies_per_severity"]
 
-        # Generate a {district_code: Polygon} dict from the fiona Collection loaded from the .shp
-        self.geo_dict = {
-            district["properties"]["district_c"]: shape(district["geometry"])
-            for district in geometry
-        }
+        # Generate a {district_code: Polygon} dict from the shapefile data
+        self.geo_dict = {i + 1: shape(geometry[i]) for i in range(len(geometry))}
 
         # Correct possible discrepancies in hospital district data and geometry data
         for hospital_id, hospital in self.hospitals.items():
