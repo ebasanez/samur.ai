@@ -37,6 +37,7 @@ from shapely.geometry import (
 
 import gym
 import numpy as np
+import pandas as pd
 import yaml
 from gym import spaces
 from gym.utils import seeding
@@ -113,7 +114,8 @@ class CitySim(gym.Env):
         self.outgoing_ambulances = []
         self.incoming_ambulances = []
 
-        self.traffic_manager = TrafficManager(self.time, self.districts)
+        default_df = pd.read_csv('../data/default_columns.csv', sep=';')
+        self.traffic_manager = TrafficManager(self.time, self.districts, '../data/traffic_models', default_df)
 
         for i in self.hospitals.keys():
             self.hospitals[i]["available_amb"] = self.initial_ambulances[i]
@@ -352,7 +354,7 @@ class CitySim(gym.Env):
             end["district_code"],
             (end["x"], end["y"]),
         )
-        total_time = self.traffic_manager.displacement_time(distance_per_district, self.time)
+        total_time = self.traffic_manager.displacement_time(distance_per_district)
 
         return timedelta(seconds=total_time)
 
