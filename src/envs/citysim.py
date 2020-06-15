@@ -100,7 +100,7 @@ class CitySim(gym.Env):
         if log_file is not None:
             self.log_file = Path(log_file)
             with self.log_file.open('w') as log:
-                log.write("City Simulation Log.")
+                log.write("City Simulation Log." + "\n")
 
     def seed(self, seed):
         np.random.seed(seed)
@@ -135,6 +135,11 @@ class CitySim(gym.Env):
         # Traffic model data
         default_df = pd.read_csv('../data/default_columns.csv', sep=';')
         self.traffic_manager = TrafficManager(self.time, self.districts, '../data/traffic_models', default_df)
+
+        # Log the reset into the log file
+        if self.log_events:
+            with self.log_file.open('a') as log:
+                log.write(f"Reset {time_start.isoformat()} {time_end.isoformat()}" + "\n")
 
         return self._get_obs()
 
@@ -188,6 +193,7 @@ class CitySim(gym.Env):
                     0,
                     code,
                 )
+                self._log_ambulance(ambulance)
                 self.total_ambulances[0] = code
                 self.incoming_ambulances.append(ambulance)
                 continue
@@ -219,6 +225,7 @@ class CitySim(gym.Env):
                 self._reward_f(time_diff, severity),
                 code,
             )
+            self._log_ambulance(ambulance)
             self.total_ambulances[severity] += 1
             self.outgoing_ambulances.append(ambulance)
 
@@ -373,6 +380,7 @@ class CitySim(gym.Env):
                     tappearance,
                     code,
                 )
+                self._log_emergency(emergency)
                 self.total_emergencies[severity] = code  # Accumulate in history
                 self.active_emergencies[severity].append(emergency)  # Add to queue
 
@@ -459,3 +467,28 @@ class CitySim(gym.Env):
         and the time reference of the emergency in order to calculate a reward for the agent.
         """
         return time_diff * severity  # Right now linear with time to emergency and severity
+
+    def _log_emergency(self, emergency):
+        if self.log_events:
+            time = self.time.isoformat()
+            severity = emergency["severity"]
+            loc = emergency["loc"]
+            x, y, district_code = loc["x"], loc["y"], loc["district_code"]
+            code = emergency["code"]
+            info = f"EM {time} {severity} {x:.8f} {y:.8f} {district_code} {code}"
+            with self.log_file.open('a') as log:
+                log.write(info + "\n")
+
+    def _log_ambulance(self, ambulance):
+        if self.log_events:
+            time = self.time.isoformat()
+            severity = ambulance["severity"]
+            origin = ambulance["origin"]
+            destination = ambulance["destination"]
+            tobjective = ambulance["tobjective"].isoformat()
+            thospital = ambulance["thospital"].isoformat()
+            reward = ambulance["reward"]
+            code = ambulance["code"]
+            info = f"AM {time} {severity} {origin} {destination} {tobjective} {thospital} {reward} {code}"
+            with self.log_file.open('a') as log:
+                log.write(info + "\n")
