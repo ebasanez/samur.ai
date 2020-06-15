@@ -51,10 +51,15 @@ class CitySim(gym.Env):
     Attributes:
         city_config: str or Path, YAML file with parameters describing the city to simulate. If no 
             file is provided, default values will be used.
-        timestep: float, time advanced at eachc step should be high to avoid sparse actions but low
+        city_geometry: str or Path, shapefile describing the limits of the city districts.
+        time_step: int, seconds advanced at each step. Should be high to avoid sparse actions but low
             to enable accuracy. Compromise. One minute by default.
         stress: float, multiplier for the emergency generator, in order to artificially increase or
             decrease the amount of emergencies and modify the stress to the system.
+        log_file: str or Path, text file where simulation events will be logged in chronological 
+            order.
+        mov_reward: int, reward that will be assigned to each ambulance that does not attend an 
+            emergency, and only moves between hospitals.
     """
 
     metadata = {
@@ -69,6 +74,7 @@ class CitySim(gym.Env):
         time_step: int = 60,
         stress: float = 1.0,
         log_file=None,
+        mov_reward: int = 0,
     ):
         """Initialize the CitySim environment."""
         assert os.path.isfile(city_config), "Invalid path for city configuration file"
@@ -77,6 +83,7 @@ class CitySim(gym.Env):
         self.time_step_seconds = time_step
         self.time_step = timedelta(seconds=self.time_step_seconds)
         self.stress = stress
+        self.mov_reward = mov_reward
 
         # Named lists for status keeping
         self.hospital = recordclass("Hospital", ["name", "loc", "available_amb"])
@@ -157,7 +164,7 @@ class CitySim(gym.Env):
         reward = 0
         for ambulance in self.outgoing_ambulances:
             if self.time >= ambulance["tobjective"]:  # Ambulance arrived at emergency
-                reward += ambulance["reward"]  # Corresponding eward is assigned at this moment
+                reward += ambulance["reward"]  # Corresponding reward is assigned at this moment
                 self.incoming_ambulances.append(ambulance)
             else:
                 new_outgoing.append(ambulance)
@@ -190,12 +197,13 @@ class CitySim(gym.Env):
                     start_hospital_id,
                     end_hospital_id,
                     0,
-                    0,
+                    self.mov_reward,
                     code,
                 )
                 self._log_ambulance(ambulance)
                 self.total_ambulances[0] = code
                 self.incoming_ambulances.append(ambulance)
+                reward += self.mov_reward  # Possible cost associated with the movement
                 continue
 
             if start_hospital_id == 0:  # Starting hospital #0 simbolizes null action for severity level
