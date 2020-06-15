@@ -80,9 +80,9 @@ class CitySim(gym.Env):
 
         # Named lists for status keeping
         self.hospital = recordclass("Hospital", ["name", "loc", "available_amb"])
-        self.emergency = recordclass("Emergency", ["loc", "severity", "tappearance"])
+        self.emergency = recordclass("Emergency", ["loc", "severity", "tappearance", "code"])
         self.moving_amb = recordclass(
-            "MovingAmbulance", ["tobjective", "thospital", "origin", "destination", "severity", "reward"]
+            "MovingAmbulance", ["tobjective", "thospital", "origin", "destination", "severity", "reward", "code"]
         )
 
         # Read configuration file for setting up the city
@@ -96,9 +96,10 @@ class CitySim(gym.Env):
         self._configure(config, geometry)
 
         # Set up log file for registering simulation events
+        self.log_events = log_file is not None
         if log_file is not None:
-            log_file = Path(log_file)
-            with log_file.open('w') as log:
+            self.log_file = Path(log_file)
+            with self.log_file.open('w') as log:
                 log.write("City Simulation Log.")
 
     def seed(self, seed):
@@ -172,20 +173,22 @@ class CitySim(gym.Env):
             start_hospital_id, end_hospital_id = start_hospitals[severity], end_hospitals[severity]
             start_hospital = self.hospitals[start_hospital_id]
             end_hospital = self.hospitals[end_hospital_id]
-            if severity == 0:  # Dummy severity to move ambulances between hospitals
+            if severity == 0:  # Move ambulances between hospitals, no emergency
                 if (end_hospital_id == 0) or (start_hospital_id == 0):
                     continue  # Null hospitals do not launch any ambulances
                 self.hospitals[start_hospital_id]["available_amb"] -= 1
                 tthospital = self._displacement_time(start_hospital["loc"], end_hospital["loc"])
+                code = self.total_ambulances[0] + 1
                 ambulance = self.moving_amb(
                     self.time, 
                     self.time + tthospital,
                     start_hospital_id,
                     end_hospital_id,
                     0,
-                    0
+                    0,
+                    code,
                 )
-                self.total_ambulances[0] += 1
+                self.total_ambulances[0] = code
                 self.incoming_ambulances.append(ambulance)
                 continue
 
@@ -206,6 +209,7 @@ class CitySim(gym.Env):
             ttobj = self._displacement_time(start_hospital["loc"], emergency["loc"])
             tthospital = self._displacement_time(emergency["loc"], end_hospital["loc"]) + ttobj
             time_diff = -ttobj.seconds
+            code = emergency["code"]
             ambulance = self.moving_amb(
                 self.time + ttobj,
                 self.time + tthospital,
@@ -213,6 +217,7 @@ class CitySim(gym.Env):
                 end_hospital_id,
                 severity,
                 self._reward_f(time_diff, severity),
+                code,
             )
             self.total_ambulances[severity] += 1
             self.outgoing_ambulances.append(ambulance)
@@ -361,8 +366,14 @@ class CitySim(gym.Env):
                 )
                 loc = self._random_loc_in_distric(district)
                 tappearance = self.time
-                emergency = self.emergency(loc, severity, tappearance)
-                self.total_emergencies[severity] += 1  # Accumulate in history
+                code = self.total_emergencies[severity] + 1
+                emergency = self.emergency(
+                    loc, 
+                    severity, 
+                    tappearance,
+                    code,
+                )
+                self.total_emergencies[severity] = code  # Accumulate in history
                 self.active_emergencies[severity].append(emergency)  # Add to queue
 
     def _displacement_time(self, start, end):
