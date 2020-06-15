@@ -260,6 +260,7 @@ class CitySim(gym.Env):
         self.severity_levels = config["severity_levels"]
         self.severity_dists = config["severity_dists"]
         self.shown_emergencies_per_severity = config["shown_emergencies_per_severity"]
+        self.n_hospitals = len(self.hospitals) - 1
 
         # Generate a {district_code: Polygon} dict from the shapefile data
         self.geo_dict = {i + 1: shape(geometry[i]) for i in range(len(geometry))}
@@ -278,6 +279,13 @@ class CitySim(gym.Env):
             self.config["hospitals"][i]["available_amb"]
             for i in range(len(self.config["hospitals"]))
         ]
+
+        # Define the action space
+        self.action_space = spaces.Tuple((
+            spaces.Tuple([spaces.Discrete(self.n_hospitals + 1)] * (self.severity_levels + 1)), 
+            spaces.Tuple([spaces.Discrete(self.n_hospitals + 1)] * (self.severity_levels + 1))
+            ))
+        s = gym.spaces.Tuple([gym.spaces.Discrete(3)]*17)
 
     def _get_obs(self):
         """Build the part of the state that the agent can know about.
