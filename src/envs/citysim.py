@@ -285,7 +285,6 @@ class CitySim(gym.Env):
             spaces.Tuple([spaces.Discrete(self.n_hospitals + 1)] * (self.severity_levels + 1)), 
             spaces.Tuple([spaces.Discrete(self.n_hospitals + 1)] * (self.severity_levels + 1))
             ))
-        s = gym.spaces.Tuple([gym.spaces.Discrete(3)]*17)
 
     def _get_obs(self):
         """Build the part of the state that the agent can know about.
