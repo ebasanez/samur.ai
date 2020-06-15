@@ -1,2 +1,7 @@
 __pycache__/
 .ipynb_checkpoints/
+.vscode/
+src/ipynb_checkpoints/
+notebooks/ipynb_checkpoints/
+src/envs/ipynb_checkpoints/
+
