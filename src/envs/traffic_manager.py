@@ -76,6 +76,6 @@ class TrafficManager():
         total_time = sum([distance / self._get_speed(self.traffic[district]) 
                           for district, distance in distance_per_district.items()]) * 3600
 
-        print('Total time: {}'.format(total_time))
+        #print('Total time: {}'.format(total_time))
 
         return total_time

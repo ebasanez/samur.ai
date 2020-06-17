@@ -15,6 +15,12 @@ probability distribution according to their severity.
 Emergencies are gerated from representative probability distributions.
 
 Created by Enrique Basañez, Miguel Blanco, Alfonso Lagares, Borja Menéndez and Francisco Rueda.
+
+TODO:
+ - Add traffic info to observation (one number per district)
+ - Reward as a function of severity -> high severity thospital instead of tobjective
+ - Remove order ID from emergency list
+
 """
 
 import calendar
@@ -51,10 +57,15 @@ class CitySim(gym.Env):
     Attributes:
         city_config: str or Path, YAML file with parameters describing the city to simulate. If no 
             file is provided, default values will be used.
-        timestep: float, time advanced at eachc step should be high to avoid sparse actions but low
+        city_geometry: str or Path, shapefile describing the limits of the city districts.
+        time_step: int, seconds advanced at each step. Should be high to avoid sparse actions but low
             to enable accuracy. Compromise. One minute by default.
         stress: float, multiplier for the emergency generator, in order to artificially increase or
             decrease the amount of emergencies and modify the stress to the system.
+        log_file: str or Path, text file where simulation events will be logged in chronological 
+            order.
+        mov_reward: int, reward that will be assigned to each ambulance that does not attend an 
+            emergency, and only moves between hospitals.
     """
 
     metadata = {
@@ -66,22 +77,29 @@ class CitySim(gym.Env):
         self,
         city_config="data/city_defaults.yaml",  # YAML file w/ city and generator data
         city_geometry="data/madrid_districs_processed/madrid_districs_processed.shp",
+        time_start: datetime = datetime.fromisoformat("2020-01-01T00:00:00"),
+        time_end: datetime = datetime.fromisoformat("2024-12-31T23:59:59"),
         time_step: int = 60,
         stress: float = 1.0,
+        log_file=None,
+        mov_reward: int = 0,
     ):
         """Initialize the CitySim environment."""
         assert os.path.isfile(city_config), "Invalid path for city configuration file"
         assert os.path.isfile(city_geometry), "Invalid path for city geometry file"
 
+        self.time_start = time_start
+        self.time_end = time_end
         self.time_step_seconds = time_step
         self.time_step = timedelta(seconds=self.time_step_seconds)
         self.stress = stress
+        self.mov_reward = mov_reward
 
         # Named lists for status keeping
         self.hospital = recordclass("Hospital", ["name", "loc", "available_amb"])
-        self.emergency = recordclass("Emergency", ["loc", "severity", "tappearance"])
+        self.emergency = recordclass("Emergency", ["loc", "severity", "tappearance", "code"])
         self.moving_amb = recordclass(
-            "MovingAmbulance", ["tobjective", "thospital", "destination", "reward"]
+            "MovingAmbulance", ["tobjective", "thospital", "origin", "destination", "severity", "reward", "code"]
         )
 
         # Read configuration file for setting up the city
@@ -94,31 +112,43 @@ class CitySim(gym.Env):
             geometry = sf.shapes()
         self._configure(config, geometry)
 
+        # Set up log file for registering simulation events
+        self.log_events = log_file is not None
+        if log_file is not None:
+            self.log_file = Path(log_file)
+            with self.log_file.open('w') as log:
+                log.write("City Simulation Log." + "\n")
+                log.write("#EM [timeISO] [severity] [coordXkm] [coordYkm] [district_code] [em_identifier]" + "\n")
+                log.write("#AM [timeISO] [severity] [hosp_origin] [hosp_destination] [tobjective] [thospital] [reward] [em_identifier]" + "\n")
+
     def seed(self, seed):
         np.random.seed(seed)
 
-    def reset(
-        self,
-        time_start: datetime = datetime.fromisoformat("2020-01-01T00:00:00"),
-        time_end: datetime = datetime.fromisoformat("2024-12-31T23:59:59"),
-    ):
+    def reset(self):
         """Return the environment to the start of a new scenario, with no active emergencies. 
-
-        Same city, but start and end times can be different. This is a necessary step at the start.
         """
-        self.time_start = time_start
-        self.time_end = time_end
-
+        # Reset status variables
         self.time = self.time_start
         self.active_emergencies = ["dummy"] + [deque() for i in range(self.severity_levels)]
         self.outgoing_ambulances = []
         self.incoming_ambulances = []
 
+        # Reset number of ambulances in hospitals to initial
+        for i in self.hospitals.keys():
+            self.hospitals[i]["available_amb"] = self.initial_ambulances[i]
+
+        # Reset cumulative variables
+        self.total_emergencies = {level: 0 for level in range(1, self.severity_levels+1)}
+        self.total_ambulances = {level: 0 for level in range(0, self.severity_levels+1)}
+
+        # Traffic model data
         default_df = pd.read_csv('../data/default_columns.csv', sep=';')
         self.traffic_manager = TrafficManager(self.time, self.districts, '../data/traffic_models', default_df)
 
-        for i in self.hospitals.keys():
-            self.hospitals[i]["available_amb"] = self.initial_ambulances[i]
+        # Log the reset into the log file
+        if self.log_events:
+            with self.log_file.open('a') as log:
+                log.write(f"Reset {self.time_start.isoformat()} {self.time_end.isoformat()}" + "\n")
 
         return self._get_obs()
 
@@ -136,7 +166,7 @@ class CitySim(gym.Env):
         reward = 0
         for ambulance in self.outgoing_ambulances:
             if self.time >= ambulance["tobjective"]:  # Ambulance arrived at emergency
-                reward += ambulance["reward"]  # Corresponding eward is assigned at this moment
+                reward += ambulance["reward"]  # Corresponding reward is assigned at this moment
                 self.incoming_ambulances.append(ambulance)
             else:
                 new_outgoing.append(ambulance)
@@ -151,26 +181,38 @@ class CitySim(gym.Env):
                 new_outgoing.append(ambulance)
         self.incoming_ambulances = new_incoming
 
-        # Take actions. As many actions as (hospitals + 1) X severity categories X hospitals
+        # Take actions. As many possible actions as (hospitals + 1) X severity categories X hospitals
         start_hospitals, end_hospitals = action
         for severity, queue in enumerate(self.active_emergencies):
             start_hospital_id, end_hospital_id = start_hospitals[severity], end_hospitals[severity]
             start_hospital = self.hospitals[start_hospital_id]
             end_hospital = self.hospitals[end_hospital_id]
-            if severity == 0:  # Dummy severity to move ambulances between hospitals
-                if (end_hospital_id == 0) or (start_hospital_id == 0):
-                    continue  # Null hospitals would not make sense here
+            if severity == 0:  # Move ambulances between hospitals, no emergency
+                if (end_hospital_id == 0) or (start_hospital_id == 0) or (self.hospitals[start_hospital_id]["available_amb"] == 0):
+                    continue  # Null or empty hospitals do not launch any ambulances
                 self.hospitals[start_hospital_id]["available_amb"] -= 1
                 tthospital = self._displacement_time(start_hospital["loc"], end_hospital["loc"])
-                ambulance = self.moving_amb(self.time, self.time + tthospital, end_hospital_id, 0)
+                code = self.total_ambulances[0] + 1
+                ambulance = self.moving_amb(
+                    self.time, 
+                    self.time + tthospital,
+                    start_hospital_id,
+                    end_hospital_id,
+                    0,
+                    self.mov_reward,
+                    code,
+                )
+                self._log_ambulance(ambulance)
+                self.total_ambulances[0] = code
                 self.incoming_ambulances.append(ambulance)
+                reward += self.mov_reward  # Possible cost associated with the movement
                 continue
 
-            if start_hospital_id == 0:  # Starting hospital #0 simbolizes null action
+            if start_hospital_id == 0:  # Starting hospital #0 simbolizes null action for severity level
                 continue
             if len(queue) == 0:  # If the queue for this severity level is empty, no action
                 continue
-            if start_hospital["available_amb"] == 0:  # No ambulances, no action
+            if start_hospital["available_amb"] == 0:  # No ambulances in initial hospital, no action
                 continue
 
             if end_hospital_id == 0:  # Null end hospital to return to start hospital
@@ -183,13 +225,18 @@ class CitySim(gym.Env):
             ttobj = self._displacement_time(start_hospital["loc"], emergency["loc"])
             tthospital = self._displacement_time(emergency["loc"], end_hospital["loc"]) + ttobj
             time_diff = -ttobj.seconds
+            code = emergency["code"]
             ambulance = self.moving_amb(
                 self.time + ttobj,
                 self.time + tthospital,
+                start_hospital_id,
                 end_hospital_id,
+                severity,
                 self._reward_f(time_diff, severity),
+                code,
             )
-
+            self._log_ambulance(ambulance)
+            self.total_ambulances[severity] += 1
             self.outgoing_ambulances.append(ambulance)
 
         # Return state, reward, and whether the end time has been reached
@@ -215,6 +262,7 @@ class CitySim(gym.Env):
         self.severity_levels = config["severity_levels"]
         self.severity_dists = config["severity_dists"]
         self.shown_emergencies_per_severity = config["shown_emergencies_per_severity"]
+        self.n_hospitals = len(self.hospitals) - 1
 
         # Generate a {district_code: Polygon} dict from the shapefile data
         self.geo_dict = {i + 1: shape(geometry[i]) for i in range(len(geometry))}
@@ -234,7 +282,13 @@ class CitySim(gym.Env):
             for i in range(len(self.config["hospitals"]))
         ]
 
-    def _get_obs(self):
+        # Define the action space
+        self.action_space = spaces.Tuple((
+            spaces.Tuple([spaces.Discrete(self.n_hospitals + 1)] * (self.severity_levels + 1)), 
+            spaces.Tuple([spaces.Discrete(self.n_hospitals + 1)] * (self.severity_levels + 1))
+            ))
+
+    def _get_obs(self, mode="tables"):
         """Build the part of the state that the agent can know about.
 
         This includes hospital locations, ambulance locations, incoming emergencies.
@@ -291,6 +345,16 @@ class CitySim(gym.Env):
         )
         observation.append(time_data)
 
+        if mode == "tables":
+            return observation
+
+        if mode == "flat":
+            # Return a flattened vector with all values in the observation but no structure
+            flat = np.concatenate([
+                piece.flatten() for piece in observation
+            ])
+            return flat
+
         return observation
 
     def _generate_emergencies(self):
@@ -321,6 +385,7 @@ class CitySim(gym.Env):
             # Poisson distribution of avg # of emergencies in period will give number of new ones
             num_new_emergencies = int(np.random.poisson(period_frequency, 1))
 
+            # If no emergencies are to be generated, skip to the next severity level
             if num_new_emergencies == 0:
                 continue
 
@@ -335,7 +400,15 @@ class CitySim(gym.Env):
                 )
                 loc = self._random_loc_in_distric(district)
                 tappearance = self.time
-                emergency = self.emergency(loc, severity, tappearance)
+                code = self.total_emergencies[severity] + 1
+                emergency = self.emergency(
+                    loc, 
+                    severity, 
+                    tappearance,
+                    code,
+                )
+                self._log_emergency(emergency)
+                self.total_emergencies[severity] = code  # Accumulate in history
                 self.active_emergencies[severity].append(emergency)  # Add to queue
 
     def _displacement_time(self, start, end):
@@ -421,3 +494,28 @@ class CitySim(gym.Env):
         and the time reference of the emergency in order to calculate a reward for the agent.
         """
         return time_diff * severity  # Right now linear with time to emergency and severity
+
+    def _log_emergency(self, emergency):
+        if self.log_events:
+            time = self.time.isoformat()
+            severity = emergency["severity"]
+            loc = emergency["loc"]
+            x, y, district_code = loc["x"], loc["y"], loc["district_code"]
+            code = emergency["code"]
+            info = f"EM {time} {severity} {x:.8f} {y:.8f} {district_code} {code}"
+            with self.log_file.open('a') as log:
+                log.write(info + "\n")
+
+    def _log_ambulance(self, ambulance):
+        if self.log_events:
+            time = self.time.isoformat()
+            severity = ambulance["severity"]
+            origin = ambulance["origin"]
+            destination = ambulance["destination"]
+            tobjective = ambulance["tobjective"].isoformat()
+            thospital = ambulance["thospital"].isoformat()
+            reward = ambulance["reward"]
+            code = ambulance["code"]
+            info = f"AM {time} {severity} {origin} {destination} {tobjective} {thospital} {reward} {code}"
+            with self.log_file.open('a') as log:
+                log.write(info + "\n")
