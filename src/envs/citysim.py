@@ -15,6 +15,12 @@ probability distribution according to their severity.
 Emergencies are gerated from representative probability distributions.
 
 Created by Enrique Basañez, Miguel Blanco, Alfonso Lagares, Borja Menéndez and Francisco Rueda.
+
+TODO:
+ - Add traffic info to observation (one number per district)
+ - Reward as a function of severity -> high severity thospital instead of tobjective
+ - Remove order ID from emergency list
+
 """
 
 import calendar
@@ -71,6 +77,8 @@ class CitySim(gym.Env):
         self,
         city_config="data/city_defaults.yaml",  # YAML file w/ city and generator data
         city_geometry="data/madrid_districs_processed/madrid_districs_processed.shp",
+        time_start: datetime = datetime.fromisoformat("2020-01-01T00:00:00"),
+        time_end: datetime = datetime.fromisoformat("2024-12-31T23:59:59"),
         time_step: int = 60,
         stress: float = 1.0,
         log_file=None,
@@ -80,6 +88,8 @@ class CitySim(gym.Env):
         assert os.path.isfile(city_config), "Invalid path for city configuration file"
         assert os.path.isfile(city_geometry), "Invalid path for city geometry file"
 
+        self.time_start = time_start
+        self.time_end = time_end
         self.time_step_seconds = time_step
         self.time_step = timedelta(seconds=self.time_step_seconds)
         self.stress = stress
@@ -108,23 +118,15 @@ class CitySim(gym.Env):
             self.log_file = Path(log_file)
             with self.log_file.open('w') as log:
                 log.write("City Simulation Log." + "\n")
+                log.write("#EM [timeISO] [severity] [coordXkm] [coordYkm] [district_code] [em_identifier]" + "\n")
+                log.write("#AM [timeISO] [severity] [hosp_origin] [hosp_destination] [tobjective] [thospital] [reward] [em_identifier]" + "\n")
 
     def seed(self, seed):
         np.random.seed(seed)
 
-    def reset(
-        self,
-        time_start: datetime = datetime.fromisoformat("2020-01-01T00:00:00"),
-        time_end: datetime = datetime.fromisoformat("2024-12-31T23:59:59"),
-    ):
+    def reset(self):
         """Return the environment to the start of a new scenario, with no active emergencies. 
-
-        Same city, but start and end times can be different. This is a necessary step at the start.
         """
-        # Reset simulation time data
-        self.time_start = time_start
-        self.time_end = time_end
-
         # Reset status variables
         self.time = self.time_start
         self.active_emergencies = ["dummy"] + [deque() for i in range(self.severity_levels)]
@@ -146,7 +148,7 @@ class CitySim(gym.Env):
         # Log the reset into the log file
         if self.log_events:
             with self.log_file.open('a') as log:
-                log.write(f"Reset {time_start.isoformat()} {time_end.isoformat()}" + "\n")
+                log.write(f"Reset {self.time_start.isoformat()} {self.time_end.isoformat()}" + "\n")
 
         return self._get_obs()
 
@@ -186,8 +188,8 @@ class CitySim(gym.Env):
             start_hospital = self.hospitals[start_hospital_id]
             end_hospital = self.hospitals[end_hospital_id]
             if severity == 0:  # Move ambulances between hospitals, no emergency
-                if (end_hospital_id == 0) or (start_hospital_id == 0):
-                    continue  # Null hospitals do not launch any ambulances
+                if (end_hospital_id == 0) or (start_hospital_id == 0) or (self.hospitals[start_hospital_id]["available_amb"] == 0):
+                    continue  # Null or empty hospitals do not launch any ambulances
                 self.hospitals[start_hospital_id]["available_amb"] -= 1
                 tthospital = self._displacement_time(start_hospital["loc"], end_hospital["loc"])
                 code = self.total_ambulances[0] + 1
@@ -286,7 +288,7 @@ class CitySim(gym.Env):
             spaces.Tuple([spaces.Discrete(self.n_hospitals + 1)] * (self.severity_levels + 1))
             ))
 
-    def _get_obs(self):
+    def _get_obs(self, mode="tables"):
         """Build the part of the state that the agent can know about.
 
         This includes hospital locations, ambulance locations, incoming emergencies.
@@ -342,6 +344,16 @@ class CitySim(gym.Env):
             ]
         )
         observation.append(time_data)
+
+        if mode == "tables":
+            return observation
+
+        if mode == "flat":
+            # Return a flattened vector with all values in the observation but no structure
+            flat = np.concatenate([
+                piece.flatten() for piece in observation
+            ])
+            return flat
 
         return observation
 
