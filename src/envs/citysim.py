@@ -19,7 +19,6 @@ Created by Enrique Basañez, Miguel Blanco, Alfonso Lagares, Borja Menéndez and
 TODO:
  - Add traffic info to observation (one number per district)
  - Reward as a function of severity -> high severity thospital instead of tobjective
- - Remove order ID from emergency list
 
 """
 
@@ -323,9 +322,9 @@ class CitySim(gym.Env):
                     loc = emergency["loc"]
                     x, y, district_code = loc["x"], loc["y"], loc["district_code"]
                     tactive = int((self.time - emergency["tappearance"]) / self.time_step)
-                    emergency_data = [severity, order, tactive, x, y, district_code]
+                    emergency_data = [severity, tactive, x, y, district_code]
                 else:
-                    emergency_data = [0, order, 0, 0, 0, 0]
+                    emergency_data = [0, 0, 0, 0, 0]
                 severity_table.append(emergency_data)
             emergencies_table.append(severity_table)
         observation.append(np.array(emergencies_table))
