@@ -18,7 +18,6 @@ Created by Enrique Basañez, Miguel Blanco, Alfonso Lagares, Borja Menéndez and
 
 TODO:
  - Add traffic info to observation (one number per district)
- - Reward as a function of severity -> high severity thospital instead of tobjective
 
 """
 
@@ -223,7 +222,7 @@ class CitySim(gym.Env):
             emergency = self.active_emergencies[severity].popleft()
             ttobj = self._displacement_time(start_hospital["loc"], emergency["loc"])
             tthospital = self._displacement_time(emergency["loc"], end_hospital["loc"]) + ttobj
-            time_diff = -ttobj.seconds
+            time_diff = -ttobj.seconds if severity <= 3 else -tthospital.seconds
             code = emergency["code"]
             ambulance = self.moving_amb(
                 self.time + ttobj,
