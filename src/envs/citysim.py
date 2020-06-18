@@ -16,9 +16,6 @@ Emergencies are gerated from representative probability distributions.
 
 Created by Enrique Basañez, Miguel Blanco, Alfonso Lagares, Borja Menéndez and Francisco Rueda.
 
-TODO:
- - Add traffic info to observation (one number per district)
-
 """
 
 import calendar
@@ -342,6 +339,18 @@ class CitySim(gym.Env):
             ]
         )
         observation.append(time_data)
+
+        # Traffic data always sorted to give the same order
+        traffic_data = []
+        all_districts = list(self.traffic_manager.traffic.keys())
+        try:
+            all_districts.remove('Missing')
+        except:
+            pass
+        sorted_districts = sorted(all_districts)
+        for district in sorted_districts:
+            traffic_data.append([district, self.traffic_manager.traffic[district]])
+        observation.append(np.array(traffic_data))
 
         if mode == "tables":
             return observation
