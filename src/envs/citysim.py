@@ -17,11 +17,9 @@ Emergencies are gerated from representative probability distributions.
 Created by Enrique Basañez, Miguel Blanco, Alfonso Lagares, Borja Menéndez and Francisco Rueda.
 
 TODO:
- - Add traffic info to observation (one number per district)
- - Reward as a function of severity -> high severity thospital instead of tobjective
- - Remove order ID from emergency list
  - Put traffic input data in __init__ parameters
 
+=======
 """
 
 import calendar
@@ -229,7 +227,7 @@ class CitySim(gym.Env):
             emergency = self.active_emergencies[severity].popleft()
             ttobj = self._displacement_time(start_hospital["loc"], emergency["loc"])
             tthospital = self._displacement_time(emergency["loc"], end_hospital["loc"]) + ttobj
-            time_diff = -ttobj.seconds
+            time_diff = -ttobj.seconds if severity <= 3 else -tthospital.seconds
             code = emergency["code"]
             ambulance = self.moving_amb(
                 self.time + ttobj,
@@ -328,9 +326,9 @@ class CitySim(gym.Env):
                     loc = emergency["loc"]
                     x, y, district_code = loc["x"], loc["y"], loc["district_code"]
                     tactive = int((self.time - emergency["tappearance"]) / self.time_step)
-                    emergency_data = [severity, order, tactive, x, y, district_code]
+                    emergency_data = [severity, tactive, x, y, district_code]
                 else:
-                    emergency_data = [0, order, 0, 0, 0, 0]
+                    emergency_data = [0, 0, 0, 0, 0]
                 severity_table.append(emergency_data)
             emergencies_table.append(severity_table)
         observation.append(np.array(emergencies_table))
@@ -349,6 +347,18 @@ class CitySim(gym.Env):
             ]
         )
         observation.append(time_data)
+
+        # Traffic data always sorted to give the same order
+        traffic_data = []
+        all_districts = list(self.traffic_manager.traffic.keys())
+        try:
+            all_districts.remove('Missing')
+        except:
+            pass
+        sorted_districts = sorted(all_districts)
+        for district in sorted_districts:
+            traffic_data.append([district, self.traffic_manager.traffic[district]])
+        observation.append(np.array(traffic_data))
 
         if mode == "tables":
             return observation
