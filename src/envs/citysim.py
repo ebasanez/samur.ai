@@ -183,8 +183,12 @@ class CitySim(gym.Env):
             start_hospital = self.hospitals[start_hospital_id]
             end_hospital = self.hospitals[end_hospital_id]
             if severity == 0:  # Move ambulances between hospitals, no emergency
-                if (end_hospital_id == 0) or (start_hospital_id == 0) or (self.hospitals[start_hospital_id]["available_amb"] == 0):
-                    continue  # Null or empty hospitals do not launch any ambulances
+                if (end_hospital_id == start_hospital_id):
+                    continue  # This movement would not make sense
+                if (self.hospitals[start_hospital_id]["available_amb"] == 0):
+                    continue  # An empty hospital cannot launch ambulances
+                if (end_hospital_id == 0) or (start_hospital_id == 0):
+                    continue  # Null hospital does not launch or receive any ambulances
                 self.hospitals[start_hospital_id]["available_amb"] -= 1
                 tthospital = self._displacement_time(start_hospital["loc"], end_hospital["loc"])
                 code = self.total_ambulances[0] + 1
