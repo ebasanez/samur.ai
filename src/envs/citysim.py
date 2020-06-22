@@ -180,10 +180,9 @@ class CitySim(gym.Env):
                 new_outgoing.append(ambulance)
         self.incoming_ambulances = new_incoming
 
-        # Take actions. As many possible actions as (hospitals + 1) X severity categories X hospitals
-        start_hospitals, end_hospitals = action
-        for severity, queue in enumerate(self.active_emergencies):
-            start_hospital_id, end_hospital_id = start_hospitals[severity], end_hospitals[severity]
+        # Take actions.
+        for every_action in action:
+            severity, start_hospital_id, end_hospital_id = every_action
             start_hospital = self.hospitals[start_hospital_id]
             end_hospital = self.hospitals[end_hospital_id]
             if severity == 0:  # Move ambulances between hospitals, no emergency
@@ -213,7 +212,7 @@ class CitySim(gym.Env):
 
             if start_hospital_id == 0:  # Starting hospital #0 simbolizes null action for severity level
                 continue
-            if len(queue) == 0:  # If the queue for this severity level is empty, no action
+            if len(self.active_emergencies[severity]) == 0:  # If the queue for this severity level is empty, no action
                 continue
             if start_hospital["available_amb"] == 0:  # No ambulances in initial hospital, no action
                 continue
