@@ -72,6 +72,8 @@ class CitySim(gym.Env):
         self,
         city_config="data/city_defaults.yaml",  # YAML file w/ city and generator data
         city_geometry="data/madrid_districs_processed/madrid_districs_processed.shp",
+        traffic_default_cols="data/default_columns.csv",
+        traffic_models="data/traffic_models",
         time_start: datetime = datetime.fromisoformat("2020-01-01T00:00:00"),
         time_end: datetime = datetime.fromisoformat("2024-12-31T23:59:59"),
         time_step: int = 60,
@@ -82,6 +84,8 @@ class CitySim(gym.Env):
         """Initialize the CitySim environment."""
         assert os.path.isfile(city_config), "Invalid path for city configuration file"
         assert os.path.isfile(city_geometry), "Invalid path for city geometry file"
+        assert os.path.isfile(traffic_default_cols), "Invalid path for traffic default file"
+        assert os.path.isdir(traffic_models), "Invalid path for traffic models directory"
 
         self.time_start = time_start
         self.time_end = time_end
@@ -106,6 +110,10 @@ class CitySim(gym.Env):
         with shapefile.Reader(str(city_geometry)) as sf:
             geometry = sf.shapes()
         self._configure(config, geometry)
+
+        # Traffic model data
+        default_df = pd.read_csv(traffic_default_cols, sep=';')
+        self.traffic_manager = TrafficManager(time_start, self.districts, traffic_models, default_df)
 
         # Set up log file for registering simulation events
         self.log_events = log_file is not None
@@ -135,10 +143,6 @@ class CitySim(gym.Env):
         # Reset cumulative variables
         self.total_emergencies = {level: 0 for level in range(1, self.severity_levels+1)}
         self.total_ambulances = {level: 0 for level in range(0, self.severity_levels+1)}
-
-        # Traffic model data
-        default_df = pd.read_csv('../data/default_columns.csv', sep=';')
-        self.traffic_manager = TrafficManager(self.time, self.districts, '../data/traffic_models', default_df)
 
         # Log the reset into the log file
         if self.log_events:
@@ -176,10 +180,9 @@ class CitySim(gym.Env):
                 new_outgoing.append(ambulance)
         self.incoming_ambulances = new_incoming
 
-        # Take actions. As many possible actions as (hospitals + 1) X severity categories X hospitals
-        start_hospitals, end_hospitals = action
-        for severity, queue in enumerate(self.active_emergencies):
-            start_hospital_id, end_hospital_id = start_hospitals[severity], end_hospitals[severity]
+        # Take actions.
+        for every_action in action:
+            severity, start_hospital_id, end_hospital_id = every_action
             start_hospital = self.hospitals[start_hospital_id]
             end_hospital = self.hospitals[end_hospital_id]
             if severity == 0:  # Move ambulances between hospitals, no emergency
@@ -209,7 +212,7 @@ class CitySim(gym.Env):
 
             if start_hospital_id == 0:  # Starting hospital #0 simbolizes null action for severity level
                 continue
-            if len(queue) == 0:  # If the queue for this severity level is empty, no action
+            if len(self.active_emergencies[severity]) == 0:  # If the queue for this severity level is empty, no action
                 continue
             if start_hospital["available_amb"] == 0:  # No ambulances in initial hospital, no action
                 continue
