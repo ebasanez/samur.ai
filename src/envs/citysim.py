@@ -103,7 +103,7 @@ class CitySim(gym.Env):
         self.emergency = recordclass("Emergency", ["loc", "severity", "tappearance", "code"])
         self.moving_amb = recordclass(
             "MovingAmbulance",
-            ["tobjective", "thospital", "origin", "destination", "severity", "reward", "code"],
+            ["tobjective", "thospital", "origin", "destination", "severity", "code"],
         )
 
         # Read configuration file for setting up the city
@@ -171,9 +171,9 @@ class CitySim(gym.Env):
         reward = 0
         for ambulance in self.outgoing_ambulances:
             if self.time >= ambulance["tobjective"]:  # Ambulance arrived at emergency
-                reward += ambulance["reward"]  # Corresponding reward is assigned at this moment
                 self.incoming_ambulances.append(ambulance)
             else:
+                reward += -ambulance["severity"] * self.time_step_seconds
                 new_outgoing.append(ambulance)
         self.outgoing_ambulances = new_outgoing
 
@@ -183,8 +183,18 @@ class CitySim(gym.Env):
             if self.time >= ambulance["thospital"]:
                 self.hospitals[ambulance["destination"]]["available_amb"] += 1
             else:
+                if ambulance["severity"] > 3:  # High severity em. still active until hospital
+                    # The 1.0 is because once you are in the ambulance, the cost should be lower
+                    reward += -ambulance["severity"] * self.time_step_seconds * 0.5
                 new_outgoing.append(ambulance)
         self.incoming_ambulances = new_incoming
+
+        # For every active emergencie still in queue, add the corresponing waiting cost
+        for severity, severity_queue in enumerate(self.active_emergencies):
+            if severity == 0:  # Skip the dummy level
+                continue
+            # Add cost proportional to number of active emergencies and severity
+            reward += -severity * self.time_step_seconds * len(severity_queue)
 
         # Take actions.
         for every_action in action:
@@ -202,13 +212,7 @@ class CitySim(gym.Env):
                 tthospital = self._displacement_time(start_hospital["loc"], end_hospital["loc"])
                 code = self.total_ambulances[0] + 1
                 ambulance = self.moving_amb(
-                    self.time,
-                    self.time + tthospital,
-                    start_hospital_id,
-                    end_hospital_id,
-                    0,
-                    self.mov_reward,
-                    code,
+                    self.time, self.time + tthospital, start_hospital_id, end_hospital_id, 0, code,
                 )
                 self._log_ambulance(ambulance)
                 self.total_ambulances[0] = code
@@ -220,9 +224,8 @@ class CitySim(gym.Env):
                 start_hospital_id == 0
             ):  # Starting hospital #0 simbolizes null action for severity level
                 continue
-            if (
-                len(self.active_emergencies[severity]) == 0
-            ):  # If the queue for this severity level is empty, no action
+            if len(self.active_emergencies[severity]) == 0:
+                # If the queue for this severity level is empty, no action
                 continue
             if start_hospital["available_amb"] == 0:  # No ambulances in initial hospital, no action
                 continue
@@ -236,7 +239,6 @@ class CitySim(gym.Env):
             emergency = self.active_emergencies[severity].popleft()
             ttobj = self._displacement_time(start_hospital["loc"], emergency["loc"])
             tthospital = self._displacement_time(emergency["loc"], end_hospital["loc"]) + ttobj
-            time_diff = -ttobj.seconds if severity <= 3 else -tthospital.seconds
             code = emergency["code"]
             ambulance = self.moving_amb(
                 self.time + ttobj,
@@ -244,7 +246,6 @@ class CitySim(gym.Env):
                 start_hospital_id,
                 end_hospital_id,
                 severity,
-                self._reward_f(time_diff, severity),
                 code,
             )
             self._log_ambulance(ambulance)
