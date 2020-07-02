@@ -84,6 +84,7 @@ class CitySim(gym.Env):
         stress: float = 1.0,
         log_file=None,
         mov_reward: int = 0,
+        actions_per_round: int = 1,
     ):
         """Initialize the CitySim environment."""
         assert os.path.isfile(city_config), "Invalid path for city configuration file"
