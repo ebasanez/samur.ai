@@ -16,6 +16,10 @@ Emergencies are gerated from representative probability distributions.
 
 Created by Enrique Basañez, Miguel Blanco, Alfonso Lagares, Borja Menéndez and Francisco Rueda.
 
+TODO:
+ - Put traffic input data in __init__ parameters
+
+=======
 """
 
 import calendar
