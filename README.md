@@ -1,5 +1,5 @@
 # samur.ai
-Reinforced learning based logistic system for SAMUR emergency vehicles deployment.
+Reinforcement Learning based logistic system for SAMUR emergency vehicles deployment.
 
 # Prerequisites
 - [Python 3.X:X](https://www.python.org/downloads/)
