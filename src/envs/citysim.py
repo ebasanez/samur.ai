@@ -542,8 +542,7 @@ class CitySim(gym.Env):
             destination = ambulance["destination"]
             tobjective = ambulance["tobjective"].isoformat()
             thospital = ambulance["thospital"].isoformat()
-            reward = ambulance["reward"]
             code = ambulance["code"]
-            info = f"AM {time} {severity} {origin} {destination} {tobjective} {thospital} {reward} {code}"
+            info = f"AM {time} {severity} {origin} {destination} {tobjective} {thospital} {code}"
             with self.log_file.open("a") as log:
                 log.write(info + "\n")
